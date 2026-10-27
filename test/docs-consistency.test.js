@@ -945,9 +945,13 @@ test('干员战斗语音 (DESIGN §21.30): the manifest data, the official prior
   assert.match(DESIGN, /\*\*Where each line plays — battle only\.\*\*/);
   assert.match(doc('docs/ASSETS.md'), /\| 干员战斗语音 \|/);
   assert.match(doc('docs/ASSETS.md'), /voiceChars/);
-  // 0.2.2: the Japanese dub beside the Chinese one (audio.voiceJp, settings 语音语言, the full zip's switch)
-  assert.equal(Object.keys(manifest.audio?.voiceJp ?? {}).length, charIds.length, 'every voiced operator has its JP tree');
-  assert.equal(manifest.stats.voiceJpChars, charIds.length);
+  // 0.2.2: the Japanese dub beside the Chinese one (audio.voiceJp, settings 语音语言, the full zip's switch). The two
+  // 联动 operators 丰川祥子 / 结城理 carry JP lines only (no CN dub), so every CN operator must be in the JP tree, not the
+  // other way round.
+  const jpIds = Object.keys(manifest.audio?.voiceJp ?? {});
+  for (const id of charIds) assert.ok(jpIds.includes(id), `${id} has its JP tree`);
+  assert.ok(jpIds.length >= charIds.length, `${jpIds.length} JP trees for ${charIds.length} CN operators`);
+  assert.equal(manifest.stats.voiceJpChars, jpIds.length);
   assert.match(doc('docs/ASSETS.md'), /voiceJp: \{ \[charId\]: \{ …the slots of `voice` \} \}/);
   assert.match(doc('docs/DEPLOY.md'), /`FULL_ZIP_JP_VOICE` 改成 `false` 时/);
   assert.match(doc('docs/ASSETS.md'), /voiceEn\?: \{ \[charId\]: \{ …the slots of `voice` \} \}/);
