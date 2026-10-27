@@ -653,7 +653,122 @@ function buildResult(victory) {
 // ---- combat simulation ------------------------------------------------------------------------------------------------
 function stopBattle() { if (S?.battle?.timer) clearInterval(S.battle.timer); if (S) S.battle = null; }
 
+/**
+ * `sim` variant: the page's own Battle (public/js/battle/simLoader.js → server/sim/spec.js) drives a normal round.
+ * The board is the player's field, `nextEnemies` the spawn schedule, and the battle's own snapshots / events go out
+ * through the same `b.snap` / `b.ev` frames the real server sends — so skills, their fx (including the collab
+ * operators' kit fx, which have no official prefabs in the local fx index), summons, damage numbers and deaths are the
+ * simulation's own. The fabricated battle below only walks enemies and rolls numbers, which is why it shows no effects.
+ * Enemies walk the two lanes of GEO.NORMAL_RECT; bonds / band / loadouts come from m.private as they stand.
+ */
+async function startSimCombat(phase) {
+  const pub = S.pub;
+  const seq = ++simSeq;
+  pub.round = lateRound() ? (ROUND || 13) : 6;
+  pub.deadline = Date.now() + 120000;
+  pub.players.forEach((p, i) => { p.status = i === 1 ? 'done' : 'combat'; });
+  // a fresh field id per run: the screen remounts the field view when the player picks another operator mid-battle
+  const fieldId = `sim-${seq}`;
+  pub.fields = [{ fieldId, kind: 'normal', players: [ME], live: true }];
+  for (const p of pub.players) p.fieldId = p.playerId === ME ? fieldId : null;
+  const fieldRef = { id: fieldId };
+  let sim;
+  try {
+    const { loadBrowserSim } = await import('/js/battle/simLoader.js');
+    await ensureSpecBuilder();
+    sim = await loadBrowserSim();
+  } catch (err) {
+    if (seq !== simSeq) return;
+    console.warn('[mock] the real simulation is unavailable, keeping the fabricated battle:', err?.message || err);
+    VARIANTS.delete('sim');
+    startCombat(phase);
+    return;
+  }
+  if (seq !== simSeq) return; // a newer start superseded this one
+  let battle;
+  try {
+    const spec = buildSimSpec(fieldId);
+    battle = sim.spec.createBattleFromSpec(spec, sim.ds, { logger: { warn() {}, error() {}, info() {}, log() {} } });
+  } catch (err) {
+    if (seq !== simSeq) return;
+    console.warn('[mock] the real battle could not be built, keeping the fabricated one:', err?.message || err);
+    VARIANTS.delete('sim');
+    startCombat(phase);
+    return;
+  }
+  if (seq !== simSeq) return;
+  const { unitInfo } = await import('/sim/snapshot.js');
+  const units = battle.units.filter((u) => u.kind === 'op' || u.kind === 'device' || u.kind === 'token').map((u) => unitInfo(u));
+  store.patch('match', { field: { fieldId, kind: 'normal', rect: { ...GEO.NORMAL_RECT }, stageId: pub.stageId, units } });
+  const t0 = performance.now();
+  const timer = setInterval(() => {
+    if (S.pub.paused) return; // (the sim has no pause; `paused` freezes the frames)
+    const target = (performance.now() - t0) / 1000;
+    while (!battle.finished && battle.time + 1e-9 < target) battle.step();
+    const snap = battle.snapshot();
+    net._emit('b.snap', { ...snap, t: 'b.snap', gt: snap.t });
+    const ev = battle.drainEvents();
+    if (ev.length) net._emit('b.ev', { t: 'b.ev', fieldId, gt: battle.time, ev });
+  }, 50);
+  S.battle = { timer, fieldRef, devices: [], battle, lethalInfo: null, lethal: () => false, hurtDevice: () => false };
+}
+
+/** The BattleSpec of a normal round for the `sim` variant: m.private's board, bonds, band and loadouts. */
+function buildSimSpec(fieldId) {
+  const pub = S.pub, priv = S.priv;
+  const units = priv.board.filter((p) => p && p.kind === 'chess').map((p) => {
+    const c = pieceRecord(p);
+    const pick = c?.diyFor ? priv.diy?.[c.diyFor] : null;
+    const lo = pick ? null : priv.loadout?.[data.lookup('chess', p.id)?.baseId || p.id];
+    return {
+      uid: p.uid, kind: 'chess', chessId: p.id, row: p.row, col: p.col,
+      ...(pick ? { diy: { ...pick } } : Number.isInteger(lo?.skill) ? { skillIndex: lo.skill } : {}),
+    };
+  });
+  const bonds = {};
+  for (const b of priv.bonds || []) {
+    if (!b || typeof b.bondId !== 'string') continue;
+    bonds[b.bondId] = { count: b.count, active: b.active, tier: b.tier, layers: b.layers };
+  }
+  const R = GEO.NORMAL_RECT;
+  // one lane per row of the normal field (9–12) + two flyer lanes: an operator on any board row sees enemies
+  const rows = [R.r0, R.r0 + 1, R.r0 + 2, R.r1];
+  const lane = (row) => ({ motion: 'WALK', start: [row, R.c1 - 1], end: [row, R.c0 + 1], checkpoints: [] });
+  const flyLane = (row) => ({ motion: 'FLY', start: [row, R.c1 - 1], end: [row, R.c0 + 1], checkpoints: [] });
+  const routes = [...rows.map(lane), flyLane(rows[0]), flyLane(rows[3])];
+  const spawns = [];
+  let laneIndex = 0;
+  for (const e of priv.nextEnemies || []) {
+    if (!e || typeof e.enemyKey !== 'string') continue;
+    const routeIndex = e.fly ? 4 + (laneIndex++ % 2) : (laneIndex++ % rows.length);
+    spawns.push({
+      time: Math.max(0, Number(e.t) || 0), enemyKey: e.enemyKey, routeIndex,
+      count: Math.max(1, Number(e.count) || 1), interval: 0.8, tag: e.tag ?? null,
+    });
+  }
+  return specOf({
+    battleId: 'dev', fieldId, kind: 'normal', seed: 20261027, modeId: pub.modeId, round: pub.round,
+    stageId: pub.stageId, rect: { ...R }, timeLimit: 120,
+    players: [{
+      playerId: ME, seat: 0, side: 'L', colOffset: 0, units, bonds,
+      bandId: priv.bandId ?? null, playerEffects: priv.effects ?? [],
+    }],
+    spawns, routes, flags: { startOpCooldown: 0, dpPerSec: 2, dpMax: 99 },
+  });
+}
+
+// spec.js is imported by simLoader() lazily; buildBattleSpec is the same module's builder.
+let specOf = null;
+let simSeq = 0;
+async function ensureSpecBuilder() {
+  if (!specOf) ({ buildBattleSpec: specOf } = await import('/sim/spec.js'));
+  return specOf;
+}
+
 function startCombat(phase) {
+  // ?variant=sim — run the REAL simulation in the page and stream its snapshots/events (skills, fx, summons, damage
+  // numbers), instead of the fabricated battle below. Normal rounds only; the other phases stay fabricated.
+  if (VARIANTS.has('sim') && phase === PHASE.COMBAT) { startSimCombat(phase); return; }
   const pub = S.pub;
   const boss = phase === PHASE.FINAL_ASSAULT || phase === PHASE.HIDDEN_CORE;
   pub.round = boss ? (phase === PHASE.HIDDEN_CORE ? 15 : 14) : lateRound() ? (ROUND || 13) : 6;
@@ -1119,6 +1234,7 @@ const SWITCH = [
   ['COMBAT', PHASE.COMBAT, ''], ['COMBAT done', PHASE.COMBAT, 'done'], ['UNITE', PHASE.UNITE, ''], ['UNITE leaker', PHASE.UNITE, 'leaker'], ['SETTLE', PHASE.SETTLE, ''],
   ['PREP 自选', PHASE.PREP, 'diy'], ['COMBAT 自选', PHASE.COMBAT, 'diy'], ['COMBAT 自选 + 致命伤', PHASE.COMBAT, 'diy,lethal'],
   ['PREP 后期 R13', PHASE.PREP, 'late'], ['COMBAT 后期 R13', PHASE.COMBAT, 'late'],
+  ['COMBAT 真实模拟', PHASE.COMBAT, 'sim'], ['COMBAT 真实模拟 后期', PHASE.COMBAT, 'sim,late'],
   ['FINAL_ASSAULT', PHASE.FINAL_ASSAULT, ''], ['FA overtime soon', PHASE.FINAL_ASSAULT, 'overtime'], ['FA draining', PHASE.FINAL_ASSAULT, 'drain'],
   ['HIDDEN_CORE', PHASE.HIDDEN_CORE, ''], ['COMBAT solo (pause)', PHASE.COMBAT, 'solo'], ['FA solo paused', PHASE.FINAL_ASSAULT, 'solo,paused'],
   ['RESULT win', PHASE.RESULT, ''], ['RESULT lose', PHASE.RESULT, 'defeat'],
