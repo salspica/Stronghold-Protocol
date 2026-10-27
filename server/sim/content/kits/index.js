@@ -151,6 +151,10 @@ export const OPERATOR_KIT_FILES = Object.freeze([
   'op-kalts2.js',
   'op-monstr.js',
   'op-clemnt.js',
+  // the two collab 6★ this private fork fields (tools/build-data.mjs DIY_INCLUDED_CHARS, the owner's decision of
+  // 2026-10-27): 丰川祥子 and 结城理. Appended last, as a new entry never reorders the ones above.
+  'op-oblvns.js',
+  'op-makoto.js',
 ]);
 
 /**

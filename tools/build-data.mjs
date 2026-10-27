@@ -534,8 +534,30 @@ const DIY_EXTRA_PROTOTYPES = Object.freeze({ 5: Object.freeze({ rarity: 4, exclu
  * 自选 owned picks left out of the data and the pool by the owner's decision of 2026-10-05: the collab operators
  * (copyright) — every 6★ whose `mainPower` or a `subPower` names one of these 联动 teams: rainbow (灰烬, 艾拉), action4
  * (麒麟R夜刀), mujica (丰川祥子), sees (结城理), laios (玛露西尔). The excel does not exclude them (research 0.2.0 §2.2).
+ * DIY_INCLUDED_CHARS below re-admits 丰川祥子 and 结城理 alone (the owner's decision of 2026-10-27); every other member
+ * of these teams, and every other AM/PS/MH/RS/DD unit, stays out.
  */
 const DIY_EXCLUDED_TEAMS = Object.freeze(['rainbow', 'action4', 'mujica', 'sees', 'laios']);
+/**
+ * The two collab 6★ this private fork fields anyway (the owner's decision of 2026-10-27, replacing the blanket
+ * exclusion for exactly these two): 丰川祥子 `char_4182_oblvns` (AM01, mujica) and 结城理 `char_4217_makoto`
+ * (PS33, SEES). They bypass DIY_EXCLUDED_TEAMS and DIY_EXCLUDED_NUMBER_PREFIXES, appear in `diy.ownedPool` and get
+ * the three owned-pick forms of `data/backups.json` like every other 自选 operator. Upstream keeps them out on
+ * copyright grounds; nothing here is meant to go upstream. A pick still needs its kit file
+ * (server/sim/content/kits/index.js OPERATOR_KIT_FILES) before the 自选 picker offers it.
+ */
+const DIY_INCLUDED_CHARS = Object.freeze(['char_4182_oblvns', 'char_4217_makoto']);
+/**
+ * Hand-designed bond sets for those two picks (the owner's decision of 2026-10-27): a deliberate deviation from the
+ * "a 自选 piece's bonds come from its factions" rule. Their 奥术 / 不屈 / 远见 / 奇迹 bonds are add-on bonds whose
+ * `powerIdList` is empty, so no derivation could ever reach them; the owner picked the combination instead.
+ *   丰川祥子: 协防干员 + 奥术 + 不屈     (emptyShip + arcaneShip + indomShip)
+ *   结城理:   拉特兰 + 远见 + 奇迹     (lateranoShip + visiShip + miraShip)
+ */
+const DIY_BOND_OVERRIDES = Object.freeze({
+  char_4182_oblvns: Object.freeze(['emptyShip', 'arcaneShip', 'indomShip']),
+  char_4217_makoto: Object.freeze(['lateranoShip', 'visiShip', 'miraShip']),
+});
 /**
  * …and every 6★ of a 联动寻访, by the prefix of its character_table `displayNumber` (the collab series: MH Monster Hunter —
  * 麒麟R夜刀 MH02, 焰狐龙梓兰 MH05, whose team reserve6 names no collab —, RS Rainbow Six, AM Ave Mujica, PS Persona, DD
@@ -632,8 +654,15 @@ function buildBackups(ctx, chess) {
       && !ch.isNotObtainable && !roster.has(id);
   }).sort(naturalCmp);
   const collabNumber = (ch) => DIY_EXCLUDED_NUMBER_PREFIXES.some((p) => new RegExp(`^${p}\\d`).test(ch.displayNumber || ''));
-  const excluded = legal6.filter((id) => teamsOf(charTable[id]).some((t) => excludedTeams.has(t)) || collabNumber(charTable[id]));
-  for (const t of DIY_EXCLUDED_TEAMS) if (!excluded.some((id) => teamsOf(charTable[id]).includes(t))) warn(`DIY_EXCLUDED_TEAMS: no owned-6★ pick of team ${t}`);
+  const isCollab = (id) => teamsOf(charTable[id]).some((t) => excludedTeams.has(t)) || collabNumber(charTable[id]);
+  // The owner's decision of 2026-10-27: a private fork may field 丰川祥子 (char_4182_oblvns, AM01 / mujica) and
+  // 结城理 (char_4217_makoto, PS33 / SEES) through the 自选 slots. The teams stay in DIY_EXCLUDED_TEAMS for every other
+  // operator, and DIY_EXCLUDED_NUMBER_PREFIXES still drops any other AM/PS unit: only these two ids bypass both rules.
+  // Upstream keeps them out (copyright) — this allowlist is private to the fork and is not a change to send upstream.
+  const allowlisted = new Set(DIY_INCLUDED_CHARS);
+  const excluded = legal6.filter((id) => isCollab(id) && !allowlisted.has(id));
+  // The staleness warning asks whether the TEAM still has any owned-6★ candidate at all; an allowlisted member counts.
+  for (const t of DIY_EXCLUDED_TEAMS) if (!legal6.some((id) => teamsOf(charTable[id]).includes(t))) warn(`DIY_EXCLUDED_TEAMS: no owned-6★ pick of team ${t}`);
   const ownedPool = legal6.filter((id) => !excluded.includes(id));
   for (const id of ownedPool) for (const st of diyStatuses.values()) addNeed(id, st);
 
@@ -662,9 +691,11 @@ function buildBackups(ctx, chess) {
       for (const k of ['nationId', 'groupId', 'teamId']) if (p?.[k] && !powers.includes(p[k])) powers.push(p[k]);
     }
     const hit = coreBonds.filter((b) => b.powerIdList.some((x) => powers.includes(x))).map((b) => b.bondId);
+    // DIY_BOND_OVERRIDES (the owner's decision of 2026-10-27) replaces the derived set for a hand-designed pick.
+    const override = DIY_BOND_OVERRIDES[id];
     operators[id] = {
       name: ch.name, rarity: rarityOf(ch), profession: ch.profession, subProfessionId: ch.subProfessionId,
-      obtainable: !ch.isNotObtainable, powers, bonds: hit.length ? hit : [fallback],
+      obtainable: !ch.isNotObtainable, powers, bonds: override ? [...override] : (hit.length ? hit : [fallback]),
     };
   }
   return { units, tokens, diy: { slots, prototypes, locked, ownedPool, excluded, operators } };
