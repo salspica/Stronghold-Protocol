@@ -256,21 +256,27 @@ const installDollkeeper = (battle, unit) => {
     startSwitch();
     const dur = DOLL_SWITCH + (unit.profile.dollDuration ?? 20);
     const mul = dollHpMul();
+    // the form the client draws: a kit may name its own (结城理's personas `dollS1` / `dollS2` / `dollS3` / `dollS3P2`,
+    // kits/ops/op-makoto.js; render/units.js FORMS); default 'doll'
+    const form = typeof unit.profile.dollForm === 'function' ? (unit.profile.dollForm(unit) || 'doll') : 'doll';
+    // 阻回 for the whole form by default (傀儡师's switch/standin); a kit whose 替身 keeps gaining SP (结城理 re-casts S3
+    // inside the standin, `dollNoSp: false`) opts out
+    const noSp = unit.profile.dollNoSp !== false;
     battle.addBuff(unit, {
       key: 'trait:substitute', duration: dur, visible: true, onExpire: leave, onRemove: leave,
       mods: { blockCnt: -99, ...(mul !== 1 ? { hpMul: mul } : null) },
-      // 阻回 for the whole form; a 替身 that makes no normal attack casts no skill either (header)
-      flags: { noSp: true, ...(unit.profile.dollNoAttack ? { disarm: true, silence: true } : null) },
+      // a 替身 that makes no normal attack casts no skill either (header)
+      flags: { ...(noSp ? { noSp: true } : null), ...(unit.profile.dollNoAttack ? { disarm: true, silence: true } : null) },
     });
     battle.releaseBlocked(unit);
-    unit.form = 'doll';
+    unit.form = form;
     unit.markDirty();
     unit.hp = unit.s.maxHp;
     // `dur`: until the switch back (the client times the 替身's closing clip with it)
-    battle.fx('substitute', at({ form: 'doll', dur }));
-    // `dollSwap` { unit, form }: a switch started — to the 替身 ('doll') or back to the 本体 (null); not fired when she is
+    battle.fx('substitute', at({ form, dur }));
+    // `dollSwap` { unit, form }: a switch started — to the 替身 (`form`) or back to the 本体 (null); not fired when she is
     // knocked out as the 替身 (不屈 rolls on both switches: PRTS 盟约记录 "切换<替身>与<本体>时")
-    if (battle.hasHook('dollSwap')) battle.emit('dollSwap', { unit, form: 'doll' });
+    if (battle.hasHook('dollSwap')) battle.emit('dollSwap', { unit, form });
     return true;
   };
   battle.on('fatal', (ctx) => {

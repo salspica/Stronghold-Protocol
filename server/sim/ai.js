@@ -48,15 +48,31 @@ import { PLUGIN_TIMES_MAX } from '../../shared/plugins/limits.js';
 // ---------------------------------------------------------------------------------------------------------------
 // profiles
 
-/** Effective attack profile of an ally unit (base profile + active skill overrides). */
+/** Effective attack profile of an ally unit (base profile + kit dynamic profile + active skill overrides). */
 export function effectiveProfile(u) {
   const base = u.profile;
   const sk = u.skill;
   const ov = sk ? sk.attackOverride() : null;
   const tg = sk ? sk.targetingOverride() : null;
-  if (!ov && !tg) return base;
+  // a kit's dynamic profile (`profileFor`, docs/SIM.md §7.2): the attack the current form / stance fights with —
+  // 结城理's <替身> personas (kits/ops/op-makoto.js), 丰川祥子's timbre switch (op-oblvns.js). Evaluated per attack;
+  // null / undefined = the base profile. Mapped like a skill attack override (onHit / onEachHit / dmgMul).
+  const dyn = u.kit && typeof u.kit.profileFor === 'function' ? u.kit.profileFor(u) : null;
+  if (!ov && !tg && !dyn) return base;
   const p = { ...base };   // (spread: the same own enumerable copy as Object.assign({}, base), on V8's object-clone fast path)
-  p.isSkill = true;
+  // (a skill's attack/targeting override marks the attack as a skill attack; a kit's dynamic form profile does not —
+  // the persona / timbre attacks are that form's normal attacks)
+  if (ov || tg) p.isSkill = true;
+  if (dyn) {
+    for (const k in dyn) {
+      if (k === 'onHit') p.skillOnHit = dyn.onHit;
+      else if (k === 'onEachHit') p.skillOnEachHit = dyn.onEachHit;
+      else if (k === 'dmgMul' && typeof dyn.dmgMul === 'number') p.skillDmgMul = dyn.dmgMul;
+      else p[k] = dyn[k];
+    }
+    if (dyn.dmgType === 'heal' && !p.heal) p.heal = { mode: 'single' };
+    if (dyn.dmgType && dyn.dmgType !== 'heal' && !dyn.heal) p.heal = null;
+  }
   if (ov) {
     for (const k in ov) {
       if (k === 'onHit') p.skillOnHit = ov.onHit;

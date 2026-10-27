@@ -1493,7 +1493,7 @@ Unknown subprofessions fall back to the profession default (test `professions.te
   extrapolated velocity uses the same moving span as the interpolation (the stand is not in its denominator).
 - `drainEvents()` tuples: `['spawn', UnitInfo]` (first appearance), `['deploy', id]` (every (re)deploy and 【移动】 — the
   client plays the deploy and its interpolation snaps instead of sliding), `['atk', src, tgt, projKind]`
-  (`none|arrow|bolt|bomb|lob|orb|drone|enemy|boomerang|droneBomb|note|chain|chainHeal`; a boomerang's way back has no event —
+  (`none|arrow|bolt|bomb|lob|orb|drone|enemy|boomerang|droneBomb|note|noteSlow|chain|chainHeal`; a boomerang's way back has no event —
   the renderer flies it back to the thrower at `BOOMERANG_RETURN_SPEED`; an enemy's `profile.shot` may name another
   kind, e.g. `mortar` for 帝国炮火先兆者, which the renderer does not draw — its fx `bombardShell` is the shell), `['dmg', tgt,
   amount, type]` (`phys|arts|true|burn|neural|necrosis|apoptosis`), `['heal', tgt, amount]`, `['skill', id, 1|0]`,

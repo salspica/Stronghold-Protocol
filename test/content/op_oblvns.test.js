@@ -71,16 +71,38 @@ test('T1 颂乐音符: her normal ranged attacks are note projectiles too (the s
   done(h);
 });
 
-test('S2 满月的舞会: 钢琴 is the equipped timbre (+60 % ATK from deployment); the cast switches to 风琴 (+80 attack speed)', () => {
+test('S2 满月的舞会: 钢琴 is the initial timbre (+60 % ATK); each cast flips to 风琴 (+80 attack speed) and back', () => {
   const { h, u } = field({ skill: 1 });
   h.spawn('enemy_dummy', { pos: [10, 7] });
-  assert.deepEqual(u.findBuff('oblvns:piano')?.mods, { atkPct: 0.6 }, 'piano');
+  assert.deepEqual(u.findBuff('oblvns:timbre')?.mods, { atkPct: 0.6 }, 'piano');
   approx(u.s.atk, u.base.atk * 1.6, 'the ATK bonus is live');
   const baseAspd = u.s.aspd;
-  u.skill.gainSp(999);
-  assert.ok(h.runUntil(() => u.skill.active, 3), 'organ on');
-  assert.equal(u.findBuff('oblvns:piano'), null, 'piano off');
+  const cast = () => {
+    const n = u.skill.activations ?? 0;
+    for (let i = 0; i < 20; i++) { u.skill.gainSp(999); h.run(0.25); if ((u.skill.activations ?? 0) > n) return; }
+    assert.fail('cast');
+  };
+  cast();
+  assert.deepEqual(u.findBuff('oblvns:timbre')?.mods, { aspd: 80 }, 'organ');
   approx(u.s.aspd, baseAspd + 80, 'organ: +80 attack speed');
+  approx(u.s.atk, u.base.atk, 'the piano ATK bonus is gone');
+  assert.equal(h.b.effectiveProfile(u).dmgType, 'arts', 'organ attacks are arts');
+  cast();
+  assert.deepEqual(u.findBuff('oblvns:timbre')?.mods, { atkPct: 0.6 }, 'back to piano');
+  assert.equal(h.b.effectiveProfile(u).dmgType, 'phys', 'piano attacks are physical');
+  done(h);
+});
+
+test('T1 颂乐音符: every live note gives the squad 3 % DEF / 2 % RES ignore (max 10)', () => {
+  const { h, u } = field({ skill: 1 });
+  h.spawn('enemy_dummy', { pos: [10, 7] });
+  h.run(4);
+  const notes = h.b.projectiles.list.filter((p) => p.source === u && p.visual === 'note').length;
+  assert.ok(notes > 0, 'notes in flight');
+  const aura = u.findBuff('oblvns:t1');
+  assert.ok(aura, 'the aura is on the squad');
+  approx(aura.mods.defIgnorePct, Math.min(10, notes) * 0.03, '3 % DEF ignore per note');
+  approx(aura.mods.resIgnorePct, Math.min(10, notes) * 0.02, '2 % RES ignore per note');
   done(h);
 });
 
@@ -95,13 +117,15 @@ test('S3 残月的余响: every attack plays 2 物理 notes at the highest-DEF e
   assert.ok(h.runUntil(() => noteHits(h, u).length >= n0 + 4, 4), 'one volley of four');
   const volley = noteHits(h, u).slice(n0, n0 + 4);
   const scale = skillOf(S3).bb['attack@atk_scale'];
-  // post-mitigation: 物理 goes through the 800 DEF enemy, 法术 through the 80 RES one
   const A = u.s.atk * scale;
-  const phys = Math.max(A - 800, 0.05 * A), arts = Math.max(A * (1 - 80 / 100), 0.05 * A);
   assert.deepEqual(volley.filter((c) => c.type === 'phys').map((c) => c.target), [def, def], 'piano tracks the highest DEF');
   assert.deepEqual(volley.filter((c) => c.type === 'arts').map((c) => c.target), [res, res], 'organ tracks the highest RES');
-  for (const c of volley.filter((x) => x.type === 'phys')) approx(c.amount, phys, '155 % ATK 物理 through 800 DEF');
-  for (const c of volley.filter((x) => x.type === 'arts')) approx(c.amount, arts, '155 % ATK 法术 through 80 RES');
+  // T1's live-note DEF/RES ignore moves the mitigation, so the amounts are bounded: 800 DEF leaves less than A, 80 RES
+  // leaves `A × (1 − res′/100)` for res′ ∈ [56, 80] (up to 30 % ignore), and every note dealt some damage
+  for (const c of volley.filter((x) => x.type === 'phys')) assert.ok(c.amount > 0 && c.amount < A, '物理 through 800 DEF');
+  for (const c of volley.filter((x) => x.type === 'arts')) {
+    assert.ok(c.amount >= A * 0.19 && c.amount <= A * 0.45, `法术 through 80 RES: ${c.amount} vs A=${A}`);
+  }
   const n1 = noteHits(h, u).length;
   assert.ok(h.runUntil(() => noteHits(h, u).length >= n1 + 4, 4), 'the next attack interval plays again');
   done(h);
