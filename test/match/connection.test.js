@@ -73,7 +73,15 @@ test('m.private shape in PREP matches DESIGN §8.3 (pieces, slots, bonds, effect
   assert.equal(priv.funds, 4);
   assert.equal(priv.shop.slots.length, 4);
   for (const s of priv.shop.slots) {
-    assert.deepEqual(Object.keys(s).sort(), ['basePrice', 'frozen', 'id', 'kind', 'price', 'sold']);
+    // `left` — 剩余 n 张, the copies still in this seat's pool (0.3.1 shared stock, DESIGN §8.3): a chess slot
+    // carries it whenever the seat has a pool entry for that chess, an item slot never does.
+    const core = ['basePrice', 'frozen', 'id', 'kind', 'price', 'sold'];
+    const keys = Object.keys(s).sort();
+    assert.deepEqual(keys.filter((k) => k !== 'left'), core);
+    if (keys.includes('left')) {
+      assert.equal(s.kind, 'chess', 'left is a chess-only slot field');
+      assert.ok(Number.isInteger(s.left) && s.left >= 0);
+    }
     assert.equal(s.frozen, false);
     assert.ok(s.kind === 'chess' || s.kind === 'item');
   }

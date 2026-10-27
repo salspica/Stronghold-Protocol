@@ -171,7 +171,7 @@ bump; clients without these controls keep their existing messages.
 { playerId, seat, alive, lp, funds, bandId, ready, canReady /* false while a personal choice or temp overflow is pending */,
   personalChoice: null | { id, round, sourceItemId, cards: [ { kind: 'bounty', id, name, desc, descRaw, ... } ] }, // recipient only, including reconnect; absent from public / scout views
   shop: { level, maxLevel: 6, upgradePrice, refreshPrice /* effective (0 when a free refresh is available) */, freeRefreshes,
-          frozen, slots: [ { kind: 'chess'|'item', id, price, basePrice, sold, frozen } | null ],  // slot.frozen: the 冻结 toggle copies onto every unsold slot, and 梓兰's 猎头顾问 freezes ONE card of an active refresh with the toggle off — every card draws its own flag (GitHub #354)
+          frozen, slots: [ { kind: 'chess'|'item', id, price, basePrice, sold, frozen, left? } | null ],  // slot.left — a chess slot only: 剩余 n 张, the copies still in this seat's pool, drawn on the card by public/js/ui/shopBar.js; absent for an item and when the seat has no pool entry. slot.frozen: the 冻结 toggle copies onto every unsold slot, and 梓兰's 猎头顾问 freezes ONE card of an active refresh with the toggle off — every card draws its own flag (GitHub #354)
           rewardOffer: null | { tier, source: 'merge'|'special', label, queued, slots: [ { kind: 'chess'|'item', id, price: 0, sold } ] } },  // §21.2
   hand:  [ Piece | null ],   // length 10, index = hand slot
   temp:  [ Piece | null ],   // length >= 5: visible slots 0..4, queued overflow at 5+; render only the first five

@@ -16,6 +16,8 @@
 // data/asset-pack.json itself carries only what the browser may see (version, the /asset-pack.zip
 // alias, size). Resolution 1 and 2 are opt-in through `localConfig`, so a unit test's fixture in a
 // temporary data directory is never shadowed by this machine's private file.
+//
+// (i18n-ignore-file: the error pages are bilingual by design, 中文 · English — docs/I18N.md)
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import { ROOT } from './config.js';
