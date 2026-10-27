@@ -39,6 +39,8 @@ const BOSS_LP_PER_GS = 1;
 
 export class MatchBoss {
   startFinalAssault(hidden) {
+    // 战斗二倍速 (speedVote.js): the boss round's battle starts on the pace the toggles decide now
+    this._applyCombatSpeed();
     const alive = this.alivePlayers();
     if (!alive.length) { this.finish({ victory: false, reason: 'eliminated' }); return; }
     this.phase = hidden ? PHASE.HIDDEN_CORE : PHASE.FINAL_ASSAULT;
@@ -434,6 +436,7 @@ export class MatchBoss {
   _settleBossBounties(ps, pp, perfect) {
     let coins = Math.max(0, Math.trunc(Number(pp.coins) || 0));
     if (perfect) for (const b of ps.bounties) if (b.card.payout === 'perfect') coins += b.card.coin;
+    ps.stats.bountyOwn += coins;
     if (coins > 0) { ps.pendingFunds += coins; ps.stats.fundsGained += coins; }
     if (!ps.bounties.length) return;
     for (const b of ps.bounties) b.roundsLeft--;
@@ -568,6 +571,8 @@ export class MatchBoss {
     this._syncTeamLp();
     this.deadline = 0;
     this.overtimeAt = 0;
+    this._damageDirty = true;
+    this._flushDamage(true);
     this.markPublic();
     this.runner = null;
     if (!hidden) {

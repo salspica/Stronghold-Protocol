@@ -490,6 +490,18 @@
 @keyframes modal-fade { from { opacity: 0; } }
 @keyframes modal-in { from { opacity: 0; transform: translateY(.14rem) scale(.985); } }
 
+/* 博士代号 dialog: shown on a first visit that carries a room invite link (ui/nickname.js) */
+.name-dialog__invite {
+  margin: 0 0 .16rem;
+  padding: .1rem .16rem;
+  font-size: calc(.16 * var(--t));
+  line-height: 1.6;
+  color: var(--text-md);
+  background: rgba(23, 249, 183, .06);
+  border-left: 2px solid var(--mint-500);
+}
+.name-dialog__invite .num { color: var(--mint-400); font-family: var(--font-display); font-weight: 700; letter-spacing: .08em; }
+
 /* ---- tooltip -------------------------------------------------------------------------------------- */
 .tt-anchor { display: inline-flex; }
 .tt-anchor--block { display: flex; }
@@ -1222,6 +1234,15 @@
   background: rgba(232, 184, 74, .16); color: #e8b84a; font-size: calc(.13 * var(--t)); font-weight: 800; letter-spacing: .08em;
   white-space: nowrap;
 }
+/* 导入素材包 (ui/assetImport.js, offered in 设置 → 素材下载): the row, hidden inputs, drop zone and status */
+.asset-import__row { display: flex; flex-wrap: wrap; align-items: center; gap: .08rem; margin: .08rem 0; }
+.asset-import__file { display: none; }
+.asset-import__drop {
+  margin: .08rem 0; padding: .14rem; border: 1px dashed var(--line-2); color: var(--text-dim);
+  text-align: center; font-size: calc(.14 * var(--t)); line-height: 1.6;
+}
+.asset-import__status { min-height: 1.2em; margin: .04rem 0; font-size: calc(.14 * var(--t)); color: var(--text-md); }
+.asset-import__reason { color: var(--amber); font-size: calc(.14 * var(--t)); }
 
 .plugin-settings { display: grid; gap: .06rem; margin-top: .08rem; }
 .plugin-settings__row { display: flex; gap: .1rem; align-items: center; justify-content: space-between; }

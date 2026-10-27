@@ -8,6 +8,14 @@ import { RemoteBattle } from '../combat/runner.js';
 import { REVIVAL_COST, REVIVAL_MIN_DONOR_LP, REVIVAL_UNAVAILABLE_REASONS, FLOW_TICKER_PRIORITY, OK, fail } from './common.js';
 
 const DAMAGE_PUBLIC_MS = 1000;
+/** Per-player totals of one field's damage rows, the leaderboard's shape. */
+const rankRowsOf = (owners) => {
+  const out = {};
+  for (const owner of Array.isArray(owners) ? owners : []) {
+    if (owner && typeof owner.playerId === 'string') out[owner.playerId] = Number(owner.total) || 0;
+  }
+  return out;
+};
 
 export class MatchExtensions {
   poolFor(player) {
@@ -42,12 +50,15 @@ export class MatchExtensions {
     this.cancel(this._damageTimer);
     this._damageTimer = null;
     // A forced phase replacement may reuse the same round/field ids; only its new field objects may write scores.
+    let reset = false;
     if (phase !== 'unite' && this.damageBoard.round === this.round && this.damageBoard.phase === phase) {
       const previous = this.damageBoard.freeze();
       this.damageBoard = createDamageBoard(this.battlePrefix);
       this.damageBoard.previousRound = previous;
+      reset = true;
     }
     this.damageBoard.startCombat(this.round, phase, this.order);
+    this.rankBoard.begin(this.round, phase, { reset });
     this._damageSampleAt = -Infinity;
     this._damageSent.clear();
     this._damageDirty = true;
@@ -60,6 +71,9 @@ export class MatchExtensions {
   _onDamageRows(f, rows, { final = null } = {}) {
     if (this.clientCombat || this.disposed || this.ended || !this.fields.includes(f)
       || f.kind !== this.damageBoard.phase || this.round !== this.damageBoard.round) return false;
+    // Server-run and Worker-streamed fields report their per-player totals here (the same rows the operator ledger
+    // receives). Client-side combat instead feeds the leaderboard from b.progress `rows`.
+    if (this._noteRankRows(f, rankRowsOf(rows?.owners))) this.markPublic();
     if (this.damageBoard.replaceField({ matchId: this.battlePrefix, round: this.round, phase: f.kind,
       kind: f.kind, fieldId: f.fieldId, gt: f.remote ? f.battle._damageGt ?? f.battle.time : f.battle.time || 0,
       owners: rows?.owners, final: final ?? (!f.live || !!f.battle.finished) })) this._damageDirty = true;
@@ -79,10 +93,62 @@ export class MatchExtensions {
     }
   }
 
+  /** One field's cumulative per-player damage (b.progress rows, or the server-run Battle's own numbers). */
+  _noteRankRows(f, rows) {
+    if (!rows || !this.rankBoard || f?.kind !== this.rankBoard.phase || !this.fields.includes(f)) return false;
+    if (!this.rankBoard.put(f.fieldId, rows)) return false;
+    this._damageDirty = true;
+    return true;
+  }
+
+  /** A finished field's exact rows replace its last live report. */
+  _noteRankResult(f) {
+    const perPlayer = f?.result?.perPlayer;
+    if (!perPlayer || typeof perPlayer !== 'object') return false;
+    const rows = {};
+    const coins = {};
+    for (const [playerId, entry] of Object.entries(perPlayer)) {
+      rows[playerId] = Number(entry?.damageDealt) || 0;
+      coins[playerId] = Number(entry?.coins) || 0;
+    }
+    if (this.rankBoard.round === this.round) this.rankBoard.putCoins(f.fieldId, coins, { unite: f.kind === 'unite' });
+    return this._noteRankRows(f, rows);
+  }
+
+  /** The public leaderboard slice: current-scope output, cumulative output, bounty and Unite kills per seat. */
+  _rankPacket() {
+    const base = this.rankBoard.packet(this.order.map((ps) => ps.playerId));
+    return {
+      ...base,
+      players: base.players.map((row) => {
+        const ps = this.players.get(row.playerId);
+        const stats = ps?.stats || {};
+        // The round's finished fields already know their bounty; live it adds to the settled total, and after the
+        // freeze it is a fallback for a settlement counter that never moved (an old checkpoint / a missed result).
+        const settledOwn = Math.max(0, Math.round(Number(stats.bountyOwn) || 0));
+        const settledUnite = Math.max(0, Math.round(Number(stats.bountyUnite) || 0));
+        const roundOwn = Math.max(0, Math.round(Number(row.roundBountyOwn) || 0));
+        const roundUnite = Math.max(0, Math.round(Number(row.roundBountyUnite) || 0));
+        const bountyOwn = base.live ? settledOwn + roundOwn : Math.max(settledOwn, roundOwn);
+        const bountyUnite = base.live ? settledUnite + roundUnite : Math.max(settledUnite, roundUnite);
+        return {
+          ...row,
+          damage: Math.max(0, Math.round((Number(stats.dmgDealt) || 0) + (base.live ? row.roundDamage : 0))),
+          bounty: bountyOwn + bountyUnite,
+          bountyOwn,
+          bountyUnite,
+          uniteKills: Math.max(0, Math.round(Number(stats.uniteKills) || 0)),
+        };
+      }),
+    };
+  }
+
   _damagePacket() {
     const packet = this.damageBoard.packet();
+    if (!packet) return null;
+    const ranks = this._rankPacket();
     // Browser-authoritative results are not a trusted operator meter. Preserve their existing combat authority.
-    return packet && this.clientCombat ? { ...packet, owners: [], available: false } : packet;
+    return this.clientCombat ? { ...packet, owners: [], available: false, ranks } : { ...packet, ranks };
   }
 
   _damageView(ps, packet) {
@@ -134,6 +200,8 @@ export class MatchExtensions {
   _freezeDamage(send = true) {
     this._sampleDamage(true, true);
     if (this.damageBoard.freeze()) this._damageDirty = true;
+    this.rankBoard.freeze();
+    this._damageDirty = true;
     this.cancel(this._damageTimer);
     this._damageTimer = null;
     if (send) this._flushDamage(true);

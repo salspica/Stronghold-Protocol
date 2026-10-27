@@ -72,9 +72,12 @@ export const MATCH_FIELDS = Object.freeze({
     '_botEmotesSettledRound',
     // plugin interaction windows (0.3.1, match/offers.js): the id counter only — no checkpoint is taken while one is open
     'offerSeq',
+    // 战斗二倍速 (match/speedVote.js): the per-seat toggles and the applied multiplier survive a restore; the next battle
+    // phase applies them to the restored game speed again
+    '_speedVotes', '_speedBoost', '_speedBase',
   ]),
   special: Object.freeze([
-    'phase', 'round', 'deadline', 'startedAt', '_battleSeq', 'damageBoard', 'poolGroups', 'playerItemPools',
+    'phase', 'round', 'deadline', 'startedAt', '_battleSeq', 'damageBoard', 'rankBoard', 'poolGroups', 'playerItemPools',
     ...RNG_NAMES,
   ]),
   derived: Object.freeze([
@@ -304,6 +307,7 @@ function buildSnapshot(m) {
     itemDebt: m.poolGroups.map((g) => [...(m.playerItemPools.get(g.playerIds[0])?.debt || new Map())]),
     rng: Object.fromEntries(RNG_NAMES.map((n) => [n, m[n].state() >>> 0])),
     damageBoard: encodeValue({ ...m.damageBoard }),
+    rankBoard: encodeValue({ ...m.rankBoard }),
   };
   // a vote in INFO_CHECK is dropped on restore: keep its paused confirmation budget instead of a zero deadline
   if (m.setupVote && m.phase === PHASE.INFO_CHECK) doc.deadlineRemainingMs = Math.max(0, Number(m.setupVote.remainingMs) || 0);
@@ -368,6 +372,7 @@ export function restoreMatch(m, doc, { createRngFromState, log = null, replay = 
     if (Number.isInteger(state)) m[name] = createRngFromState(state >>> 0);
   }
   if (doc.damageBoard && typeof doc.damageBoard === 'object') Object.assign(m.damageBoard, decodeValue(doc.damageBoard));
+  if (doc.rankBoard && typeof doc.rankBoard === 'object') Object.assign(m.rankBoard, decodeValue(doc.rankBoard));
   m.stage = m.stageId ? m.gd.stage(m.stageId) : null;
   // the game data a release ships may have dropped what the checkpoint holds: such a match does not come back
   if ((m.stageId && !m.stage) || (m.bossId && !m.gd.boss(m.bossId))) { log?.warn?.(`[snapshot] ${m.roomCode}: checkpoint refused (data)`); return false; }

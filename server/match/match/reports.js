@@ -32,6 +32,7 @@ export class MatchReports {
     // report drops never-spawned enemies from `total`, and a takeover may report a different number)
     if (Number.isInteger(msg.resolved)) p.resolved = Math.max(0, Math.min(1e5, msg.resolved));
     f.lastProgressAt = this.sched.now();
+    this._noteRankRows(f, msg.rows);
     if (f.kind === 'boss' || f.kind === 'hidden') {
       this._creditBoss(f, msg.bossDmg, msg.by);
       this._creditLp(f, msg.leaks, true);

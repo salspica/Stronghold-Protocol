@@ -164,6 +164,7 @@ export const ERR = Object.freeze({
   SPECTATOR: 'SPECTATOR',         // a spectator seat only watches (MAX_SPECTATORS)
   START_RETRY: 'START_RETRY',     // cluster start: a player's game channel was not ready in time (server/cluster/lobby.js)
   MAINTENANCE: 'MAINTENANCE',     // the limits file's maintenance switch is on (server/onlineLimit.js): no new room / start / matchmaking
+  HOST_REQUIRED: 'HOST_REQUIRED', // 自建服门禁：只有房主邀请链接可以建房
   // room.setPlugins (DESIGN §32): a plugin this server has not installed; one a room cannot switch on in this version
   // (not a cosmetic or content plugin it loads, not of the room's scope, or not allowed by the server owner's
   // plugins/config.json); a requirement missing or out of range, or a load-order cycle; two plugins in conflict; a set
@@ -208,6 +209,7 @@ export const ERR_TEXT = {
   QUEUED: N_('正在匹配中，请先取消匹配'),
   LIMIT: N_('房间、对局或 AI 队友数量已达上限，请先退出其他房间或稍后再试'),
   MAINTENANCE: N_('服务器即将维护，暂停开启新的模拟'),
+  HOST_REQUIRED: N_('只有房主邀请链接可以建房，请向房主要邀请链接'),
   PLUGIN_UNKNOWN: N_('本服务器没有安装该插件'), PLUGIN_BLOCKED: N_('该插件不能在房间中启用'), PLUGIN_DEPENDENCY: N_('缺少该插件需要的其他插件'),
   PLUGIN_CONFLICT: N_('所选插件互相冲突'), PLUGIN_LIMIT: N_('所选插件的素材总量超出本服务器的上限'),
   PLUGIN_RULE_CONFLICT: N_('两个插件把同一个规则开关设成了不同的选项'),

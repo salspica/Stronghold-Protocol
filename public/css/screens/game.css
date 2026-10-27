@@ -240,6 +240,20 @@
 .pausebtn.is-on { background: var(--mint-500); border-color: var(--mint-400); color: var(--text-on-mint); box-shadow: 0 0 .22rem rgba(23, 249, 183, .45); }
 .pausebtn.is-busy { opacity: .6; }
 
+/* 战斗二倍速 toggle (ui/hud.js SpeedVoteButton, server/match/match/speedVote.js): 2× + on/need, left of the clock */
+.speedbtn {
+  display: flex; align-items: center; gap: .05rem; height: .6rem; padding: 0 .1rem; flex: none;
+  background: rgba(10, 14, 12, .88); border: 2px solid rgba(242, 242, 242, .75); color: #fff;
+  box-shadow: 0 .04rem .16rem rgba(0, 0, 0, .55); font-family: var(--font-num); line-height: 1;
+  transition: background var(--t-fast), border-color var(--t-fast), color var(--t-fast), box-shadow var(--t-fast);
+}
+.speedbtn__x { font-size: .22rem; font-weight: 700; }
+.speedbtn__n { font-size: .14rem; color: var(--text-lo); }
+.speedbtn:hover { background: rgba(255, 255, 255, .14); border-color: #fff; }
+.speedbtn.is-on { background: var(--mint-500); border-color: var(--mint-400); color: var(--text-on-mint); box-shadow: 0 0 .22rem rgba(23, 249, 183, .45); }
+.speedbtn.is-on .speedbtn__n { color: var(--text-on-mint); }
+.speedbtn.is-live:not(.is-on) { border-color: var(--mint-400); color: var(--mint-400); }
+
 /* boss-round overtime warning (ui/hud.js OvertimeWarning; red DOT look: official icon_warn / blood_icon + bg_lose_hp) */
 .otwarn {
   position: relative; display: flex; align-items: center; gap: .08rem; height: .38rem; padding: 0 .14rem 0 .1rem;
@@ -895,6 +909,12 @@
 .set-assets__tier button small { font-size: max(calc(.12 * var(--t)), calc(11px * var(--ui))); font-weight: 400; opacity: .85; }
 .set-assets__tier button:disabled { cursor: default; }
 .set-assets__tier button:disabled:not(.is-on) { opacity: .55; }
+.set-assets__local { margin-top: .04rem; padding-top: .1rem; border-top: 1px dashed var(--line); }
+.set-assets__local .title-assets__item { display: flex; flex-direction: column; align-items: flex-start; gap: .06rem; }
+.set-assets__local .title-assets__item small { font-size: max(calc(.12 * var(--t)), calc(11px * var(--ui))); color: var(--text-dim); line-height: 1.6; }
+.set-assets__local .title-assets__item + .title-assets__item { margin-top: .12rem; }
+/* the disabled button's hover hint lives on this wrapper: a disabled <button> does not receive the hover itself */
+.set-assets__local .title-assets__done { align-self: stretch; }
 .set-assets .set-hint { margin-top: 0; }
 .set-assets .pbar__label, .set-assets .set-keys__note { font-size: max(calc(.14 * var(--t)), calc(12px * var(--ui))); }
 .set-assets .set-hint.is-warn { color: var(--amber); }

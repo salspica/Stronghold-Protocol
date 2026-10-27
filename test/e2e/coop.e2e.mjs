@@ -11,7 +11,7 @@
 // Co-op (host 1920×1080, guest 1280×720): title → 玩法说明 → lobby → create a 同盟模拟 room (险境) → add an AI → the
 // guest joins through the ?room= invite link → ready → start → briefing (both ready) → band draft (the guest skips
 // once) → rounds 1..N: merge reward if offered, enemy drawer, emote (bubble seen by the teammate), level up (two taps),
-// buy an item, refresh (R), buy operators (two taps: 确认购买), drag hand → board (legal tiles lit) + choose a direction on
+// buy an item, refresh (D), buy operators (two taps: 确认购买), drag hand → board (legal tiles lit) + choose a direction on
 // the deploy wheel (g.move carries `dir`), board → board (+ wheel), board → hand, re-orient in place (drop on the own
 // tile + wheel), sell by tapping a unit → underframe 出售 +N, equip an item by dragging it onto an operator, detail
 // panel (right-click), bond popup, freeze and unfreeze, watch a teammate's field during prep (前往查看), settings,
@@ -212,7 +212,7 @@ async function refreshKey(c) {
   const before = await shop();
   if (before.funds < before.price) return false;
   await c.page.mouse.click(c.w / 2, c.h * 0.3); // focus the page (not a text field)
-  await c.page.keyboard.press('KeyR');
+  await c.page.keyboard.press('KeyD');
   // a free refresh (机变 补给 …) changes the free counter, a paid one the funds; the slots are rerolled either way
   const t0 = Date.now();
   let now = null;
@@ -221,9 +221,9 @@ async function refreshKey(c) {
     if (now.phase !== 'PREP' || now.funds !== before.funds || now.free !== before.free || now.ids !== before.ids) break;
     await sleep(150);
   }
-  assert.ok(now.funds !== before.funds || now.free !== before.free || now.ids !== before.ids, `${c.label}: R refreshed the shop`);
+  assert.ok(now.funds !== before.funds || now.free !== before.free || now.ids !== before.ids, `${c.label}: D refreshed the shop`);
   if (before.price > 0) assert.equal(now.funds, before.funds - before.price, `${c.label}: refresh cost`);
-  c.note(`refresh (R) ${before.price ? `funds ${before.funds} → ${now.funds}` : `free (${before.free} → ${now.free})`}, slots ${before.ids === now.ids ? 'same ids' : 'rerolled'}`);
+  c.note(`refresh (D) ${before.price ? `funds ${before.funds} → ${now.funds}` : `free (${before.free} → ${now.free})`}, slots ${before.ids === now.ids ? 'same ids' : 'rerolled'}`);
   return true;
 }
 

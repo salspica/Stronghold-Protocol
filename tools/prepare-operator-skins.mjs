@@ -1,7 +1,7 @@
 // Import verified PRTS appearances. Artwork stays ignored; registry entries contain metadata only.
 // The source directory is separate from scripts and never used as an interpreter/build working directory.
 import { readFile, writeFile, mkdir, lstat, rename, rm, realpath, link } from 'node:fs/promises';
-import { resolve, join, dirname } from 'node:path';
+import { resolve, join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync } from 'node:fs';
@@ -97,7 +97,9 @@ export async function prepareSkins({ sourceDir, fetchSources = false, catalogue 
   if (!['legacy', 'metadata'].includes(modelSource) || !Array.isArray(catalogue) || catalogue.length > 1000
     || (modelSource === 'metadata' && new Set(catalogue.map(skin => skin?.id)).size !== catalogue.length)) throw new Error('Invalid bounded skin import');
   const source = resolve(sourceDir); await mkdir(source, { recursive: true });
-  if (!(await lstat(source)).isDirectory() || await realpath(source) !== source) throw new Error('Unsafe source directory');
+  // Windows 的临时目录可能返回 8.3 短路径；把父目录也展开后再比较，既接受短路径，也仍然拒绝指向别处的符号链接源目录。
+  const expectedSource = join(await realpath(dirname(source)), basename(source));
+  if (!(await lstat(source)).isDirectory() || await realpath(source) !== expectedSource) throw new Error('Unsafe source directory');
   const prior = await readFile(manifestPath), manifest = JSON.parse(prior);
   const registryPrior = registryPath ? await readFile(registryPath).catch(error => { if (error.code === 'ENOENT') return null; throw error; }) : null;
   const skins = {}, accepted = [], inventory = [], failures = [], dynamicFailures = [], preserved = [], models = [];

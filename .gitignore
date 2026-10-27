@@ -78,6 +78,9 @@ deploy/stardust/build/
 # actual deployment receipts stay private; the public directory contains guidance only
 deploy/stardust/releases/*.json
 deploy/stardust/openi-resolver/openi-assets.json
+# the per-host private asset-pack source (server/http/assetPack.js LOCAL_ASSET_PACK): the dataset name
+# and revision are deployment material. data/asset-pack.json is the tracked, browser-safe half.
+/asset-pack.local.json
 *.upload.checkpoint.json
 **/.openi/
 **/.modelscope/

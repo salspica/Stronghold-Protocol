@@ -4,7 +4,7 @@ rem Settings come from scripts\service.env.cmd (written by the installer; NODE_E
 rem Output goes to logs\server.log (rotated at 10 MB to logs\server.old.log); the server is restarted 5 s after it exits.
 setlocal EnableExtensions
 cd /d "%~dp0.."
-set "NODE_EXE=node"
+set "NODE_EXE=C:\Users\Administrator\Documents\trae_projects\wsxy\_tools\node-v24.22.0-win-x64\node.exe"
 rem Dual-stack default (IPv6 and IPv4 on one socket). scripts\service.env.cmd may override HOST.
 set "HOST=::"
 if exist "%~dp0service.env.cmd" call "%~dp0service.env.cmd"

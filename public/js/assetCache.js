@@ -111,6 +111,37 @@ function pathnameOf(url) {
  */
 export const IMPORTED_INDEX_URL = '/sp-imported-index.json';
 
+/**
+ * One tiny entry that says a full import finished on this origin. 设置 → 素材下载 disables both ways of importing
+ * while it exists; 清除已导入的素材 deletes the whole cache, marker included. It never enters the index above.
+ */
+export const IMPORT_COMPLETE_URL = '/sp-import-complete.json';
+
+/** Record that an import finished with every file accepted (assetPack.js calls this as the run ends). */
+export async function markImportComplete(cachesApi = globalThis.caches) {
+  if (!cachesApi?.open) return false;
+  try {
+    const cache = await cachesApi.open(IMPORTED_ASSET_CACHE);
+    await cache.put(IMPORT_COMPLETE_URL, new Response(JSON.stringify({ complete: true, at: Date.now() }), {
+      status: 200, headers: { 'Content-Type': 'application/json' },
+    }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Whether a full import already finished here, from the online pack or a local one: false when unknown or cleared. */
+export async function importedInFull(cachesApi = globalThis.caches) {
+  if (!cachesApi?.open) return false;
+  try {
+    const cache = await cachesApi.open(IMPORTED_ASSET_CACHE);
+    return Boolean(await cache.match(IMPORT_COMPLETE_URL));
+  } catch {
+    return false;
+  }
+}
+
 /** The index as a Set, or null without a readable one. */
 async function readImportIndex(cache) {
   try {
@@ -128,7 +159,7 @@ async function keyPaths(cache) {
   const out = new Set();
   for (const req of await cache.keys()) {
     const path = pathnameOf(typeof req === 'string' ? req : req.url);
-    if (path && path !== IMPORTED_INDEX_URL) out.add(path);
+    if (path && path !== IMPORTED_INDEX_URL && path !== IMPORT_COMPLETE_URL) out.add(path);
   }
   return out;
 }

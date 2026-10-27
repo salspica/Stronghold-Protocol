@@ -202,8 +202,8 @@ describe('user playtest #6 — UI items 6 / 10 (mock harness, headless Chrome)',
       await sleep(200);
       for (const [kind, sel] of [['operator', '.shopbar__cards .scard:not(.scard--sold):not(.is-disabled)'], ['item', '.shopbar__item .scard:not(.scard--sold):not(.is-disabled)']]) {
         for (const spot of SPOTS) {
-          // a fresh card for every spot: the next operator card; the item slot comes back with a refresh (R)
-          if (!(await page.$(sel))) { await page.keyboard.press('KeyR'); await sleep(350); }
+          // a fresh card for every spot: the next operator card; the item slot comes back with a refresh (D)
+          if (!(await page.$(sel))) { await page.keyboard.press('KeyD'); await sleep(350); }
           const slotIdx = await page.evaluate((s) => {
             const el = document.querySelector(s);
             const S = globalThis.__MOCK__.S();

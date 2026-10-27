@@ -227,6 +227,7 @@ export class MatchClientCombat {
     f.live = false;
     this._clearFieldTimers(f);
     if (!f.result) f.result = syntheticResult(f.players, { bossBy: f.bossBy });
+    this._noteRankResult(f);
     // Client/headless compatibility: credit only after the validated result's natural release, not ahead of its clock.
     if (!f.result.synthetic) this._syncNormalLayers(f, Object.fromEntries(
       Object.entries(f.result.perPlayer || {}).map(([pid, pp]) => [pid, pp.layerGains || {}])));

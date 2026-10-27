@@ -461,6 +461,26 @@ export function PauseButton({ paused, busy = false, onToggle }) {
   <//>`;
 }
 
+// 战斗二倍速 toggle (server/match/match/speedVote.js): each alive human switches it freely; once at least half of the
+// connected alive humans have it on, the next battle phase fights at twice the normal pace for everyone (including the
+// seats that left it off). The count is the live tally, not a timed vote.
+/**
+ * @param {{ vote: { on: string[], count: number, voters: number, need: number, doubled: boolean, active: boolean, boost: number },
+ *   mine: boolean, onToggle?: (on: boolean) => void }} props
+ */
+export function SpeedVoteButton({ vote, mine, onToggle }) {
+  if (!vote) return null;
+  const count = Number(vote.count) || 0, need = Number(vote.need) || 0;
+  return html`<${Tooltip} text=${t('半数以上玩家开启后，下一回合战斗开始全员以二倍速作战')} placement="bottom">
+    <button type="button" class=${cx('speedbtn', 'tapx', mine && 'is-on', vote.doubled && 'is-live')}
+        aria-pressed=${mine ? 'true' : 'false'} aria-label=${t('战斗二倍速')}
+        data-testid="speed-vote" data-count=${count} data-need=${need} onClick=${() => onToggle?.(!mine)}>
+      <span class="speedbtn__x">2×</span>
+      <span class="speedbtn__n num">${count}/${need}</span>
+    </button>
+  <//>`;
+}
+
 /** A frozen stage budget / round-start balance. The changing real-time countdown stays separate. */
 export function UniteBudgetNote({ pub }) {
   const budget = uniteBudgetInfo(pub);
@@ -488,10 +508,11 @@ export function UniteBudgetNote({ pub }) {
  *   frozenAt: the server time every clock shows while the solo match is paused (null = live)
  *   live: the own battle's pending LP loss (liveLp): the tower keeps the settled lp and adds a red −N tick, 联防中 during 联防;
  *     `left` (a leaker in 联防): its enemies still standing — the capsule's ×N tag
+ *   onSpeedVote: the 战斗二倍速 toggle beside the clock (g.speedVote; m.public.speedVote, battle phases only)
  */
 export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, onReady, readyBusy, readyCount, playerCount, pen = false, penAvail = false, onPen = () => {},
   config = null, frozenAt = null, pause = null, live = null, spectator = false,
-  spectators = null, myId = null, isHost = false, onRemoveSpectator = null, room = null }) {
+  spectators = null, myId = null, isHost = false, onRemoveSpectator = null, room = null, onSpeedVote = () => {} }) {
   const [loadOpen, setLoadOpen] = useState(false);
   const phase = pub?.phase;
   const boss = isBossPhase(phase);
@@ -568,6 +589,8 @@ export function TopBar({ pub, priv, conn, hud, total, drawer, onExit, onDrawer, 
 
     <div class="gtop__right">
       <div class="gtop__clock">
+        ${pub?.speedVote && !spectator && priv?.alive !== false
+          ? html`<${SpeedVoteButton} vote=${pub.speedVote} mine=${(pub.speedVote.on || []).includes(myId)} onToggle=${onSpeedVote} />` : null}
         ${frozenSecs != null
           ? html`<${Countdown} seconds=${frozenSecs} total=${total ?? undefined} size="md" label="PAUSED" />`
           : html`<${Countdown} deadline=${pub?.deadline} total=${total ?? undefined} size="md" />`}

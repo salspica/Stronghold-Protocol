@@ -22,7 +22,7 @@ export function onBusy(fn) { busyListeners.add(fn); return () => busyListeners.d
 
 // Single-flight shop refresh (GitHub #501, single-ptilopsis): under a high RTT the shop has not answered yet while the
 // player taps 刷新 again — every extra g.refresh the client sends is a paid refresh (server/match intents.js → ps.refresh).
-// A tap while the previous request is still on the wire is dropped; the button dims and the R hotkey stays inert (both
+// A tap while the previous request is still on the wire is dropped; the button dims and the refresh (D) hotkey stays inert (both
 // call actions.refresh) until the request settles (success or failure). This is not server-side cancellation or
 // idempotency: a timed-out request may already have executed. The shop bar receives onRefreshBusy via the game screen.
 let refreshPending = false;
@@ -99,6 +99,8 @@ export const actions = {
   autoplay: (on) => act('g.autoplay', { on }),
   // solo battles only (ui/matchStatus.js pauseAvailable): m.public.paused follows
   pause: (on) => act('g.pause', { on: !!on }, { sfx: on ? 'click' : 'confirm' }),
+  // 战斗二倍速 (server/match/match/speedVote.js): this seat's toggle; the next battle phase's pace follows the tally
+  speedVote: (on) => act('g.speedVote', { on: !!on }, { sfx: on ? 'confirm' : 'back' }),
   // room-level intent (NOT g.*): the host frees a spectator seat while the match runs — the server takes room.removeSpectator at
   // any time (server/lobby.js removeSpectator), the game screen had no entry for it (ui/hud.js SpectatorPill; GitHub #120)
   removeSpectator: (playerId) => act('room.removeSpectator', { playerId }, { sfx: 'back' }),

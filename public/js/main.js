@@ -45,7 +45,7 @@ import './queueCancellation.js';
 import { store, useStore, emptyMatch, selectRoute, sessionResetNotice, isSpectating } from './store.js';
 import { data, useData } from './data.js';
 import { GAME_FILES } from './ui/gameComponents.js';
-import { NameHost, sanitizeName, defaultName } from './ui/nickname.js';
+import { NameHost, sanitizeName } from './ui/nickname.js';
 import { LobbyScreen, rememberRoom, parseRoomParam, joinRoom } from './screens/lobby.js';
 import { RoomScreen, TrustedNotice } from './screens/room.js';
 import { GameScreen } from './screens/game.js';
@@ -56,7 +56,6 @@ import { matchMusic } from './ui/lobbyMusic.js';
 import { GuideHost } from './ui/guide.js';
 import { installDeviceSupport } from './ui/device.js';
 import { registerImportedAssetWorker } from './assetCache.js';
-import { installAssetHints } from './ui/assetSection.js';
 import { codeSource } from './codeSource.js';
 import { LoadoutHost } from './screens/loadout.js';
 import { StatsHost } from './screens/stats.js';
@@ -511,8 +510,6 @@ async function boot() {
   // Hashed art a player imported, and — with the release's material profile (/code-source.json) — the art this page
   // fetches, kept by path across the provider's rotating signed redirects. HTTPS or localhost only; never stops boot.
   void codeSource.get().then((source) => registerImportedAssetWorker(undefined, undefined, source?.material ?? null));
-  // a slow material load suggests 设置 → 素材下载 once per session (fork: ui/assetSection.js)
-  installAssetHints();
   // A page restored from the back/forward cache has a dead socket and a stale token choice: start over.
   window.addEventListener('pageshow', (ev) => { if (ev.persisted) location.reload(); });
   // Pick this tab's reconnect token (asks other live tabs; ≤150 ms) while fonts load.
@@ -522,7 +519,8 @@ async function boot() {
   const savedName = sanitizeName(identity.loadName());
   store.set((s) => ({
     me: { ...s.me, name: savedName },
-    session: { entered: true },
+    // 首次进入（没有记住的代号）先不连接：NameHost 弹出代号输入框，确认后才连服务器并加入房间
+    session: { entered: !!savedName },
     ui: { ...s.ui, pendingJoin },
   }));
 
@@ -558,13 +556,8 @@ async function boot() {
   // the language (and its UI translations) before the first render: no Chinese flash for an English player
   const langReady = initLang().catch((err) => console.warn('[app] language setup failed', err));
   const connectWhenReady = Promise.all([identityReady, langReady]).then(() => {
-    // a first visit (no gate callsign, nothing remembered): 博士 + four digits in the chosen language; ✎ renames
-    const name = savedName || defaultName();
-    if (!savedName) {
-      identity.saveName(name);
-      store.set((s) => ({ me: { ...s.me, name } }));
-    }
-    net.setName(name);
+    // 有记住的代号就直接连接；首次进入等用户在代号输入框里确认后再连接（不再自动生成随机昵称）
+    if (savedName) net.setName(savedName);
   });
   await Promise.all([waitForFonts(1200), connectWhenReady, langReady]);
   const root = document.getElementById('app');

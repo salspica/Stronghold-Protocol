@@ -540,7 +540,7 @@ export function SettingsModal({ open, onClose }) {
         </div>
       </div>
       <p class="set-hint set-uiscale-note">${t('对局界面整体缩放：调小后棋盘更大，商店不用收起也能一边购买一边部署。默认手机 80%，电脑 100%。')}</p>
-      <${AssetSection} voice=${s.voiceLang} native=${s.voiceNative} />
+      <${AssetSection} />
       <${HotkeySection} keys=${s.keys} touchUi=${touchUi} />
       <${ScreenFitSection} />
       <${CosmeticSection} />

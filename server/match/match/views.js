@@ -100,6 +100,10 @@ export class MatchViews {
       } : null,
       // 投票移出 an offline AI-托管 teammate (kickVote.js): null or { id, proposerId, targetId, voters, agreed, rejected, need, deadline }
       kickVote: this.kickVoteView(),
+      // 战斗二倍速 (speedVote.js), PREP and the battle phases: null or { on: [playerId], count, voters, need, doubled,
+      // active, boost } — `doubled` is the pace the next battle phase starts with, `active` / `boost` the one now
+      // (boost is the multiplier the client's countdown gauge divides its total by)
+      speedVote: this.speedVoteView(),
       factions: this.factions.slice(),
       disabledBonds: [...new Set([...this.disabledBonds, ...this.staticInactiveBonds])].sort(),
       drawnDisabledBonds: this.disabledBonds.slice(),
@@ -161,6 +165,10 @@ export class MatchViews {
         // the LP this round's own battle will cost at settlement so far (COMBAT / 联防 only, omitted when 0)
         ...this._pendingLpView(ps),
       })),
+      // the in-match leaderboard's compact slice (ui/rankBoard.js): current-scope output, cumulative output, bounty
+      // split and Unite kills. m.public carries it alongside m.damage.ranks so a reconnect / a stale m.damage can
+      // never leave the panel without data.
+      ...(this.rankBoard ? { ranks: this._rankPacket() } : {}),
       fields: this.fields.map((f) => {
         const v = { fieldId: f.fieldId, kind: f.kind, players: f.players.slice(), live: !!f.live };
         if (this.phase === PHASE.UNITE && this._uniteRelay) v.battleId = f.battleId || f.spec?.battleId || f.battle?.opts?.battleId;

@@ -995,8 +995,8 @@ describe('data.js', () => {
 // ---- unit: screen helpers & components ----------------------------------------------------------------------
 
 describe('screen helpers', () => {
-  test('nickname: sanitizeName / isValidName / defaultName', async () => {
-    const { sanitizeName, isValidName, defaultName } = await mod('ui/nickname.js');
+  test('nickname: sanitizeName / isValidName', async () => {
+    const { sanitizeName, isValidName } = await mod('ui/nickname.js');
     assert.equal(sanitizeName('  凯尔希  '), '凯尔希');
     assert.equal(sanitizeName('a\u0000b\u200bc\u202ed'), 'abcd');
     assert.equal(sanitizeName('a   b'), 'a b');
@@ -1013,19 +1013,15 @@ describe('screen helpers', () => {
     assert.equal(sanitizeName(null), '');
     assert.equal(isValidName('   '), false);
     assert.equal(isValidName('Doctor'), true);
-    // a first visit's name: 博士 + four digits, a valid name the server keeps unchanged
-    for (let i = 0; i < 20; i++) {
-      const name = defaultName();
-      assert.match(name, /^博士\d{4}$/);
-      assert.equal(server.sanitizeName(name), name);
-    }
   });
 
-  test('no title screen: boot connects with the remembered or a generated name, the lobby renames', () => {
+  test('no title screen: a first visit asks for the nickname before connecting, the lobby renames', () => {
     const main = readFileSync(path.join(PUBLIC, 'js/main.js'), 'utf8');
     assert.ok(!/screens\/title\.js/.test(main) && !existsSync(path.join(PUBLIC, 'js/screens/title.js')));
-    assert.match(main, /const name = savedName \|\| defaultName\(\);/);
-    assert.match(main, /<\$\{NameHost\} \/>/, 'the rename dialog is mounted over every route');
+    assert.match(main, /session: \{ entered: !!savedName \}/, 'a first visit stays unentered until the nickname is confirmed');
+    assert.match(main, /if \(savedName\) net\.setName\(savedName\);/, 'no nickname is generated for the player');
+    assert.doesNotMatch(main, /defaultName/, 'no generated fallback name');
+    assert.match(main, /<\$\{NameHost\} \/>/, 'the nickname dialog is mounted over every route');
     const lobby = readFileSync(path.join(PUBLIC, 'js/screens/lobby.js'), 'utf8');
     assert.match(lobby, /class="me-rename" onClick=\$\{rename\}/);
     assert.ok(!/backToTitle|lobby-back/.test(lobby), 'no way back to a title screen');
@@ -1129,7 +1125,8 @@ describe('screen helpers', () => {
     assert.equal(roomFacts(room, 'h').canStart, false, 'disconnected guest blocks start');
     assert.equal(roomFacts(room, 'g').canStart, false, 'guests cannot start');
     assert.equal(roomFacts(null, 'x').mine, null);
-    assert.match(inviteLink('ABCD'), /\?room=ABCD$/);
+    // 自建服门禁：邀请链接在 ?room=CODE 后追加访客密钥（本项目补丁）
+    assert.match(inviteLink('ABCD'), /\?room=ABCD&invite=[0-9a-f]{32}$/);
   });
 
   test('room: spectator seats (community report #26) — isSpectating; roomFacts never counts a spectator as a player', async () => {

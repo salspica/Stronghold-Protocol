@@ -342,6 +342,15 @@ live countdown or a promise that saved first-field time expands the second cap.
 
 盟约栏支持「收起／展开盟约」（GitHub #142）：收起时隐藏完整列表并关闭由列表打开的浮层，让原图标区域的指针事件到达棋盘，只保留至少 44×44 CSS px 的恢复按钮。折叠状态在本局阶段变化、观看队友时保留；展开后仍按当前观看对象显示最新盟约。按钮支持 Enter / Space，聚焦按钮时 Space 不触发准备或暂停。
 
+**盟约追踪 (a remake feature, ui/trackBonds.js, 0.3.1).** In 休整期 a 盟约追踪 button sits on its own line above the shop
+bar's 剩余可放置角色 and opens a multi-select of every bond (official `identifier` order). The selection is a personal,
+client-only display preference — never uploaded, and it stays for the rest of the match (it is not a server rule like the
+公开 预选盟约, ui/bondPlan.js). Every shop card and every operator card of a merge / 定向投放 reward that carries a
+selected bond gets a mint border, the carried bond chips are highlighted and a 追踪 ribbon names it; a bond the mode
+switches off stays selectable and its chip keeps 本局禁用. The highlight uses the card's composed record (`c.bonds`), so
+自选编队 and 补位 cards are covered too. Every operator card also shows 剩余{n}张 between its name and its bond row —
+the copies still in the seat's pool (its own 自选 stock for a slotted piece, m.private shop / reward slots `left`).
+
 A bond the mode never activates (标准: official `inactiveBondIdList`) reads 本局禁用 on shop / reward cards (struck through), detail chips and the popup — no 在场 count, no 当前效果 (§21.7); a strategy built around one carries a 本局禁用 tag and note in the strategy draft and stays selectable (bands.json `bondIds`, §21.26).
 
 The strategy draft enables skip only on the viewer's turn, with quota left and another unpicked player to pass to.
@@ -734,6 +743,27 @@ restarts (a new match / a rewound round); a new round's prep clears only 当前�
 enters b.progress / b.result, and a tracked battle's result and rendered events are byte-identical to an untracked one
 (test/match/combat-metrics.test.js, test/match/runner.test.js). Ported from [xinhai-ai/Stronghold-Protocol](https://github.com/xinhai-ai/Stronghold-Protocol)
 (其公开部署分支，作者 @临夏俨然) with thanks.
+
+### In-match leaderboard (战场排行)
+
+The right edge of the game HUD carries a collapsible leaderboard (`ui/rankBoard.js`, `css/screens/rank-board.css`),
+independent of the opt-in 作战统计 meter above. It starts as one small floating icon; tapping it opens a floating window
+that can be dragged by its title bar and stays within the viewport. The default position sits left of the top-right
+effects column so those controls stay reachable; 收起 / Esc closes it back to the icon. It lists **all seats** in four
+tabs:
+
+- 本回合输出 — each player's actual damage in the current combat scope (normal + 联防 of one round; a Boss / Hidden
+  Core scope of its own), live at ~1 Hz;
+- 全局输出 — cumulative actual damage this match;
+- 赏金 — bounty coins earned, with the personal / 联防 split in each row;
+- 联防击杀 — enemies killed inside 联防 fields.
+
+Rows sort high → low, ties by seat, and the own seat is highlighted. The current-round rows and cumulative totals are
+`m.damage.ranks`, mirrored into `m.public.ranks` (network.md) so a reconnect or a skipped damage frame still has data:
+the live round damage comes from the field authority's `b.progress rows` (or the same per-player rows of a server-run /
+Worker-streamed field), while the cumulative output, bounty split and 联防 kills are the server's `PlayerState.stats`
+counters updated at settlement. All four are display only — nothing in the leaderboard feeds an outcome. In
+client-side combat the operator meter (`m.damage.owners`) stays empty as before; only this aggregate slice is filled.
 
 ### Forge compact metadata (0.3.1)
 

@@ -738,6 +738,9 @@ export function createBattleRunner(deps) {
     // enemies knocked out or leaked. Sent only when the battle reports one (Battle.resolved) — an absent field leaves
     // the teammate UI on its `resolved ?? killed` fallback
     if (Number.isFinite(p.resolved)) msg.resolved = Math.max(0, Math.min(msg.total, p.resolved));
+    // the leaderboard's live current-round output (shared/protocol.js b.progress `rows`): cumulative actual damage of
+    // every player in this field. Display only — the match never reads it for an outcome.
+    if (p.rows && typeof p.rows === 'object') msg.rows = p.rows;
     if (bossLike(e)) {
       const pool = e.battle.sharedBoss;
       msg.leaks = Math.min(1e6, e.meter.lp);

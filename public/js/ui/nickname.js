@@ -1,9 +1,9 @@
-// 博士代号 (nickname): validation, the remembered name and the rename dialog. There is no title screen (the owner's
-// decision of 2026-10-15: the password gate already asks for the callsign and stores it as `sp.name`, so the title was
-// skipped anyway): boot connects with the remembered name — a first visit without one gets 博士 + four digits — and the
-// lobby's ✎ beside the name chip opens <NameHost/>. A hello refused with NAME_REJECTED (a legacy name, a reserved one)
-// sets `session.entered` false: the dialog then opens over whatever screen is up — a room or match is kept — and only a
-// new valid name closes it.
+// 博士代号 (nickname): validation, the remembered name and the rename dialog. There is no separate title screen:
+// a first visit (nothing remembered) blocks on <NameHost/> before the socket connects — the nickname is never
+// generated for the player — and later visits connect with the remembered name; the lobby's ✎ beside the name chip
+// reopens the same dialog. A hello refused with NAME_REJECTED (a legacy name, a reserved one) sets `session.entered`
+// false: the dialog then opens over whatever screen is up — a room or match is kept — and only a new valid name
+// closes it.
 //
 // Saving validates the nickname (1..NAME_MAX_LEN chars, no control characters), stores it and hands it to net.js, which
 // sends `hello` (now, or as soon as the socket is open); on a live socket the server renames the session and resyncs.
@@ -59,13 +59,6 @@ export function sanitizeName(raw) {
 /** @param {any} raw @returns {boolean} */
 export const isValidName = (raw) => sanitizeName(raw).length > 0;
 
-/** A first visit's name (no gate callsign, no remembered name): 博士 + four random digits. */
-export function defaultName() {
-  let n;
-  try { n = globalThis.crypto.getRandomValues(new Uint16Array(1))[0] % 10000; } catch { n = Math.floor(Math.random() * 10000); }
-  return sanitizeName(`${t('博士')}${String(n).padStart(4, '0')}`);
-}
-
 /**
  * Use a nickname: remember it and send it (a first hello, or a rename on the live socket).
  * @param {string} rawName
@@ -93,6 +86,8 @@ export function NameHost() {
 /** @param {{ entered: boolean }} props `entered` false: a refused name — no cancel until a valid one went out */
 function NameDialog({ entered }) {
   const lastError = useStore((s) => s.connection.lastError);
+  // 首次进入时带着房间分享链接：说明确认代号后会自动加入该房间
+  const pendingJoin = useStore((s) => (s.session.entered ? null : s.ui.pendingJoin));
   const [value, setValue] = useState(() => store.get().me.name || identity.loadName() || '');
   const inputRef = useRef(null);
   // the current name selected (the Modal focused the field before this runs): typing replaces it
@@ -109,6 +104,7 @@ function NameDialog({ entered }) {
   return html`<${Modal} open=${true} micro="CALLSIGN" title=${t('博士代号')} onClose=${close} closeOnBackdrop=${!!close} class="name-dialog"
     actions=${html`${close ? html`<${Button} variant="ghost" onClick=${close}>${t('取消')}<//>` : null}
       <${Button} variant="primary" disabled=${!valid} onClick=${save}>${t('确认')}<//>`}>
+    ${pendingJoin ? html`<p class="name-dialog__invite">${t('收到同盟邀请')}<b class="num">${pendingJoin}</b>${t('· 输入代号后将自动加入')}</p>` : null}
     <${TextField} size="lg" icon="user" value=${value} maxLength=${NAME_MAX_LEN}
       placeholder=${t('输入你的代号（最多 {NAME_MAX_LEN} 字）', { NAME_MAX_LEN })}
       inputRef=${inputRef} onInput=${setValue} onEnter=${save} invalid=${rejected} hint=${rejected ? lastError.text : null} />

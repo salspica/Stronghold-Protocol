@@ -139,7 +139,8 @@ export async function readMaterialBody(res, progress) {
 /** Consume inside the attempt: stalled/error bodies and invalid JSON can fail over, not just fetch() headers. */
 export function fetchMaterial(url, read = r => r.arrayBuffer(), { fetch: doFetch = (...a) => globalThis.fetch(...a), ...options } = {}) {
   return withMaterialFallback(url, async (source, signal, progress) => {
-    const res = await doFetch(source, { credentials: 'omit', signal });
+    // 自建服门禁：同源的素材/音频请求必须带上 sp_gate cookie；跨源（OpenI 回退源）仍然不带凭据。
+    const res = await doFetch(source, { credentials: 'same-origin', signal });
     if (!res?.ok || /(?:text\/html|application\/xhtml\+xml)/i.test(res.headers?.get?.('content-type') || '')) {
       try { void res?.body?.cancel?.().catch(() => {}); } catch { /* unusable response */ }
       throw Object.assign(new Error('material response unavailable'), { status: res?.status, badContentType: !!res?.ok });

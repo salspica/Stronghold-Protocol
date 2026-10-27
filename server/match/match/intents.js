@@ -55,6 +55,8 @@ export class MatchIntents {
       case 'g.watch': return this.watch(ps, msg.fieldId, msg.playerId ?? null);
       case 'g.autoplay': return this.setAutoplay(ps, !!msg.on);
       case 'g.pause': return this.setPause(ps, !!msg.on);
+      // 战斗二倍速 (speedVote.js): this seat's toggle for the next battle phase's pace
+      case 'g.speedVote': return this.setSpeedVote(ps, !!msg.on);
       // server-run combat: this browser runs its own fields locally / its replica wants the stream (localReplica.js)
       case 'g.sim': return this.setLocalSim(ps, msg);
       // the stats the board's units start their next battle with (the detail card in prep, user playtest #4 item 7)

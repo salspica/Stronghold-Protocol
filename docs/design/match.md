@@ -20,7 +20,8 @@ LOBBY(room) → INFO_CHECK (co-op 25 s; solo and any single-human match untimed 
                     at the deadline personal choices are auto-picked first, then
                     the temp pieces due at this prep are resolved (chess sold back, items destroyed, summon stacks removed — they come back at the next round start, §20.1) — pieces that arrived
                     after Ready or during the <休整期结束时> effects wait for the next prep (§6.2 tempDue))
-     COMBAT        (one Battle per alive player, all in parallel, 2×; watchers get snapshots; solo: pausable, §14 Solo pause)
+     COMBAT        (one Battle per alive player, all in parallel, 2× — the 战斗二倍速 toggles may double it, below;
+                    watchers get snapshots; solo: pausable, §14 Solo pause)
      UNITE         (co-op only, if ≥1 leaked & ≥1 perfect: ≤2 perfect helpers in `unite.js helperOrder` order (research 08 §5 / PRTS 帮助:
                     most units on the field > an active bond > most standing units > most active bonds > Σ active layers > seat;
                     the pair ordered by units > active bond > Σ active layers > standing > most active bonds > seat, the first one
@@ -73,6 +74,18 @@ explicitly has `uniteRound: 1, uniteRounds: 1`; below-eight plans retain the leg
 fields still fence current field / battle identity and do not advertise a second-generation relay key. See
 [EXPERIMENTAL-MULTIPLAYER.md](../EXPERIMENTAL-MULTIPLAYER.md). Local inline / actual-Worker regressions and browser
 fixtures cover these rules and reconnects; no deployment, full natural match or production-capacity claim is implied.
+
+**战斗二倍速 (a remake feature, match/speedVote.js).** Every alive, connected human seat owns one freely switchable
+toggle (`g.speedVote { on }`, the 2× button left of the top-right clock in battle phases). It is not a timed vote: the
+decision is taken when a battle phase starts — `COMBAT` and 最终攻势 / 隐秘核心 — from the toggles as they stand then. At
+least half of the connected, alive humans (rounded up; bots, eliminated seats and spectator seats never vote) having it on
+doubles that battle for the whole match; otherwise the normal pace stays. A change made during a battle therefore applies
+from the next battle phase, and a 联防 that follows a round's combat keeps the round's pace. The doubled pace multiplies
+the match's game speed (2 by default, `opts.combatSpeed` in tools) by 2 — the simulation keeps its 30 ticks per game
+second, field clock, deadlines and boss overtime follow it, and the golden results do not move. `m.public.speedVote`
+(PREP and the battle phases) carries `{ on, count, voters, need, doubled, active, boost }`; `doubled` is the pace of the
+next battle phase, `active` / `boost` the one now (the client's countdown gauge divides its total by `boost`). A player
+may therefore pre-set the next battle during 休整期. The toggles survive a checkpoint.
 
 ### 6.2 Player state (PlayerState.js) — authoritative per player
 

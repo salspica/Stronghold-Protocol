@@ -9,8 +9,13 @@ import { isObj } from './shared.js';
 /** The rebindable shortcuts in the settings' order (the ready key also pauses / resumes a solo battle). Esc is fixed. */
 export const HOTKEY_ACTIONS = Object.freeze(['buy', 'refresh', 'freeze', 'levelUp', 'retreat', 'sell', 'ready']);
 
-/** Default key of each action (a KeyboardEvent.code), including W to buy the hovered shop card. */
-export const DEFAULT_HOTKEYS = Object.freeze({ buy: 'KeyW', refresh: 'KeyR', freeze: 'KeyF', levelUp: 'KeyD', retreat: 'KeyQ', sell: 'KeyX', ready: 'Space' });
+/** Default key of each action (a KeyboardEvent.code), including W to buy the hovered shop card. D refreshes, R upgrades
+ * (the owner's swap of 2026-10-18). */
+export const DEFAULT_HOTKEYS = Object.freeze({ buy: 'KeyW', refresh: 'KeyD', freeze: 'KeyF', levelUp: 'KeyR', retreat: 'KeyQ', sell: 'KeyX', ready: 'Space' });
+
+// The defaults before the owner's 2026-10-18 R / D swap. A saved profile holds the whole map once any setting changed, so
+// a map still equal to these is migrated: players who never rebound a key get the new defaults too.
+const LEGACY_DEFAULT_HOTKEYS = Object.freeze({ buy: 'KeyW', refresh: 'KeyR', freeze: 'KeyF', levelUp: 'KeyD', retreat: 'KeyQ', sell: 'KeyX', ready: 'Space' });
 
 // The keys a shortcut may use → the `key` value each types on a US layout (lower case): letters, digits, Space, the
 // punctuation keys, and six named keys whose `key` equals their `code`. Everything else stays with the interface: Esc
@@ -65,7 +70,8 @@ export function sanitizeHotkeys(raw) {
     const used = new Set(HOTKEY_ACTIONS.filter((a) => a !== 'buy').map((a) => out[a]));
     out.buy = Object.values(DEFAULT_HOTKEYS).find((code) => !used.has(code));
   }
-  return new Set(Object.values(out)).size === HOTKEY_ACTIONS.length ? out : { ...DEFAULT_HOTKEYS };
+  if (new Set(Object.values(out)).size !== HOTKEY_ACTIONS.length) return { ...DEFAULT_HOTKEYS };
+  return HOTKEY_ACTIONS.every((a) => out[a] === LEGACY_DEFAULT_HOTKEYS[a]) ? { ...DEFAULT_HOTKEYS } : out;
 }
 
 /**

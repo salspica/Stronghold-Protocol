@@ -17,11 +17,13 @@
 
 import { splitHashedPath } from '../../shared/assetPaths.js';
 import { mediaUrl } from './media.js';
-import { IMPORTED_ASSET_CACHE, addImportedPaths, putImportedAsset, pruneImportedPaths } from './assetCache.js';
+import { IMPORTED_ASSET_CACHE, addImportedPaths, markImportComplete, putImportedAsset, pruneImportedPaths } from './assetCache.js';
 
 export const MAX_ZIP_ENTRIES = 500_000;
 export const MAX_ENTRY_BYTES = 256 * 1024 * 1024;
 export const MAX_CD_BYTES = 64 * 1024 * 1024;
+/** Files hashed and stored ahead of the read. One cache.put per file dominates a whole-pack import (~45,000). */
+const STORE_CONCURRENCY = 4;
 
 const CRC_TABLE = (() => {
   const table = new Uint32Array(256);
@@ -108,43 +110,98 @@ function zip64Extra(extra, need) {
 
 /**
  * Random access to an archive: `size`, and `read(offset, length)` → the bytes. A Blob (the File a player picks or drops)
- * is read slice by slice and its deflated entries stream from their slice, so a whole-pack zip (some 700 MB) never sits
- * in memory at once; bytes already in memory are read in place.
+ * is read through 16 MiB windows: a 45k-entry pack would otherwise cost ~90k tiny `Blob.slice` reads (a 30-byte local
+ * header plus the entry data per file), and those reads dominate the import. Stored entries are returned in place;
+ * deflated ones still stream from their slice when the window does not hold them.
  * @param {Blob | ArrayBuffer | Uint8Array} data
  */
 async function zipSource(data) {
   if (data && typeof data.slice === 'function' && typeof data.arrayBuffer === 'function' && typeof data.stream === 'function'
     && Number.isFinite(data.size)) {
-    return {
-      size: data.size,
-      read: async (offset, length) => new Uint8Array(await data.slice(offset, offset + length).arrayBuffer()),
-      part: (offset, length) => data.slice(offset, offset + length),
-      copies: true,
-    };
+    return blobSource(data);
   }
   const bytes = await toBytes(data);
   if (!bytes) return null;
   return { size: bytes.length, read: async (offset, length) => bytes.subarray(offset, offset + length), part: null, copies: false };
 }
 
+/** Windows kept in memory: the current one, the next, and two for a lookup that steps back. */
+const ZIP_WINDOW_BYTES = 16 * 1024 * 1024;
+const ZIP_WINDOW_KEEP = 4;
+
+function blobSource(data) {
+  const windows = new Map();
+  const windowAt = async (index) => {
+    const hit = windows.get(index);
+    if (hit) {
+      windows.delete(index);
+      windows.set(index, hit);
+      return hit;
+    }
+    const start = index * ZIP_WINDOW_BYTES;
+    const end = Math.min(data.size, start + ZIP_WINDOW_BYTES);
+    const bytes = new Uint8Array(await data.slice(start, end).arrayBuffer());
+    windows.set(index, bytes);
+    while (windows.size > ZIP_WINDOW_KEEP) windows.delete(windows.keys().next().value);
+    return bytes;
+  };
+  const read = async (offset, length) => {
+    if (!(length > 0)) return new Uint8Array(0);
+    // Long reads (a big stored entry, the central directory) go straight to the Blob: one read, no window churn.
+    if (length > ZIP_WINDOW_BYTES) return new Uint8Array(await data.slice(offset, offset + length).arrayBuffer());
+    const first = Math.floor(offset / ZIP_WINDOW_BYTES);
+    const last = Math.floor((offset + length - 1) / ZIP_WINDOW_BYTES);
+    if (first === last) {
+      const bytes = await windowAt(first);
+      const at = offset - first * ZIP_WINDOW_BYTES;
+      return bytes.subarray(at, at + length);
+    }
+    const out = new Uint8Array(length);
+    let filled = 0;
+    for (let index = first; index <= last && filled < length; index++) {
+      const bytes = await windowAt(index);
+      const at = Math.max(0, offset - index * ZIP_WINDOW_BYTES);
+      const take = Math.min(bytes.length - at, length - filled);
+      if (take <= 0) continue;
+      out.set(bytes.subarray(at, at + take), filled);
+      filled += take;
+    }
+    return out;
+  };
+  const part = (offset, length) => {
+    if (!(length > 0)) return new Uint8Array(0);
+    const first = Math.floor(offset / ZIP_WINDOW_BYTES);
+    const last = Math.floor((offset + length - 1) / ZIP_WINDOW_BYTES);
+    const cached = first === last ? windows.get(first) : null;
+    if (cached) {
+      const at = offset - first * ZIP_WINDOW_BYTES;
+      return cached.subarray(at, at + length);
+    }
+    return data.slice(offset, offset + length);
+  };
+  return { size: data.size, read, part, copies: true };
+}
+
 /**
  * Read a zip's central directory. Stored entries are copied; method 8 is inflated with
  * `DecompressionStream('deflate-raw')`. Encryption and any other method are skipped per entry (`unsupported`).
  * A broken archive returns `{ ok: false, code: 'bad-zip' }` and does not throw. A Blob is read in slices (zipSource).
+ * `verifyCrc` reads every entry's bytes a second time in JavaScript (177 MB/s on a 2.8 GiB pack): the importer
+ * turns it off because the SHA-256 it compares with the manifest already covers the same bytes.
  * @param {Blob | ArrayBuffer | Uint8Array} data
  */
-export async function openZip(data) {
+export async function openZip(data, { verifyCrc = true } = {}) {
   let src;
   try { src = await zipSource(data); } catch { return { ok: false, code: 'bad-zip' }; }
   if (!src || src.size < 22) return { ok: false, code: 'bad-zip' };
   try {
-    return await readDirectory(src);
+    return await readDirectory(src, verifyCrc);
   } catch {
     return { ok: false, code: 'bad-zip' };
   }
 }
 
-async function readDirectory(src) {
+async function readDirectory(src, verifyCrc = true) {
   const tailStart = Math.max(0, src.size - (22 + 65535));
   const tail = await src.read(tailStart, src.size - tailStart);
   const at = findEocd(tail);
@@ -229,7 +286,7 @@ async function readDirectory(src) {
   return {
     ok: true,
     entries: list,
-    read: (entry) => readEntry(src, entry),
+    read: (entry) => readEntry(src, entry, verifyCrc),
   };
 }
 
@@ -246,7 +303,7 @@ async function inflateRaw(comp) {
   }
 }
 
-async function readEntry(src, entry) {
+async function readEntry(src, entry, verifyCrc = true) {
   if (!entry || entry.encrypted || (entry.method !== 0 && entry.method !== 8)) {
     return { ok: false, code: 'unsupported' };
   }
@@ -273,7 +330,7 @@ async function readEntry(src, entry) {
     raw = await inflateRaw(src.part ? src.part(dataStart, entry.compSize) : await src.read(dataStart, entry.compSize));
     if (!raw || raw.byteLength !== entry.uncompSize) return { ok: false, code: 'bad-entry' };
   }
-  if (entry.crc !== 0 && crc32(raw) !== entry.crc) return { ok: false, code: 'bad-entry' };
+  if (verifyCrc && entry.crc !== 0 && crc32(raw) !== entry.crc) return { ok: false, code: 'bad-entry' };
   return { ok: true, bytes: raw };
 }
 
@@ -622,7 +679,9 @@ export function createAssetImport({
   const readManifest = (url, optional) => readServedManifest(doFetch, url, optional);
 
   async function loadZip(data) {
-    const zip = await openZip(data);
+    // No CRC pass: every byte read here is hashed with SHA-256 and compared with the manifest, which is the same
+    // proof the CRC gives. With CRC on, a 2.8 GiB pack spent about 16 s re-reading itself in JavaScript.
+    const zip = await openZip(data, { verifyCrc: false });
     if (!zip.ok) throw Object.assign(new Error('bad-zip'), { code: 'bad-zip' });
     const list = [];
     for (const entry of zip.entries) {
@@ -630,6 +689,9 @@ export function createAssetImport({
       if (!path) continue;
       list.push({
         path,
+        // Kept so the walk below can go in archive order: a 16 MiB window then finds each entry already in memory.
+        // Without it every read is at a random offset and the window cache is thrown away on each one.
+        localOffset: entry.localOffset,
         read: async () => {
           try { return await zip.read(entry); } catch { return { ok: false, code: 'bad-entry' }; }
         },
@@ -706,6 +768,24 @@ export function createAssetImport({
       }
 
       const spineOnly = new Set();
+      // Read in archive order. The manifests are grouped by category, so their own order jumps back and forth across
+      // the zip (10k backward jumps in the 0.3.1 pack); sorting by local offset lets zipSource's windows find each
+      // entry already in memory. Group members stay together because they sit in the same folder.
+      // -1 for a source with no offsets (a folder import): finite, so the comparator never returns NaN.
+      const offsetOf = (rel) => packByRel.get(rel)?.localOffset ?? -1;
+      const groupsByOffset = plan.groups
+        .map((group, index) => {
+          let at = Infinity;
+          for (const member of group.members) {
+            const offset = offsetOf(member.rel);
+            if (offset < at) at = offset;
+          }
+          return { group, index, at };
+        })
+        .sort((a, b) => a.at - b.at || a.index - b.index)
+        .map((item) => item.group);
+      const filesByOffset = [...plan.files].sort((a, b) => offsetOf(a[0]) - offsetOf(b[0]));
+
       for (const group of plan.groups) {
         for (const member of group.members) {
           if (!plan.files.has(member.rel)) spineOnly.add(member.rel);
@@ -738,7 +818,7 @@ export function createAssetImport({
         }
       };
 
-      for (const group of plan.groups) {
+      for (const group of groupsByOffset) {
         if (cancelFlag) break;
         const present = group.members.filter((member) => packByRel.has(member.rel));
         if (present.length !== group.members.length) {
@@ -797,7 +877,22 @@ export function createAssetImport({
         }
       }
 
-      for (const [rel, spec] of plan.files) {
+      // Hash and store a few files ahead of the read: each cache.put waits on a cross-process write, and the next
+      // entry's bytes do not depend on it. Reading stays in archive order, so zipSource's windows are still reused;
+      // the queue only bounds how many files are held at once.
+      const storeAhead = [];
+      const verifyAndStore = async (rel, spec, bytes) => {
+        const hash = await sha256Hex16(bytes);
+        if (cancelFlag) return;
+        const urls = [];
+        if (hash === spec.hash) urls.push(...cacheUrlsFor(spec.url));
+        for (const alt of spec.alts) if (hash === alt.hash) urls.push(...cacheUrlsFor(alt.url));
+        if (!urls.length) { settle(rel, 'rejected'); return; }
+        await store(urls, bytes);
+        settle(rel, 'accepted');
+      };
+
+      for (const [rel, spec] of filesByOffset) {
         if (cancelFlag) break;
         if (outcome.has(rel) || !packByRel.has(rel)) continue;
         const got = await readRel(rel);
@@ -807,16 +902,11 @@ export function createAssetImport({
           reads.delete(rel);
           continue;
         }
-        const hash = await sha256Hex16(got.bytes);
-        const urls = [];
-        if (hash === spec.hash) urls.push(...cacheUrlsFor(spec.url));
-        for (const alt of spec.alts) if (hash === alt.hash) urls.push(...cacheUrlsFor(alt.url));
-        if (urls.length) {
-          await store(urls, got.bytes);
-          settle(rel, 'accepted');
-        } else settle(rel, 'rejected');
         reads.delete(rel);
+        storeAhead.push(verifyAndStore(rel, spec, got.bytes).catch(() => settle(rel, 'failed')));
+        if (storeAhead.length >= STORE_CONCURRENCY) await storeAhead.shift();
       }
+      await Promise.all(storeAhead);
 
       if (!cancelFlag) {
         for (const rel of packByRel.keys()) if (!outcome.has(rel)) settle(rel, 'skipped');
@@ -833,6 +923,10 @@ export function createAssetImport({
         error = cause?.code === 'bad-zip' || cause?.code === 'manifest' ? cause.code : 'unknown';
       }
     } finally {
+      // A complete run turns both import buttons off (settings), across reloads: the marker lives in the same cache.
+      if (phase === 'complete') {
+        try { await markImportComplete(cachesApi); } catch { /* this session still knows via the state below */ }
+      }
       // before the end is published: the dialog's count and the download queue read the index as the import ends
       if (cache && storedPaths.size) {
         try { await addImportedPaths(cache, storedPaths); } catch { /* the entries stay; Cache.keys() may still list them */ }

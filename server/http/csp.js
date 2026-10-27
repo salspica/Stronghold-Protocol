@@ -18,5 +18,9 @@ export function siteCsp(publicDir) {
       hashes.add(`'sha256-${createHash('sha256').update(m[1]).digest('base64')}'`);
     }
   }
-  return `default-src 'self'; script-src 'self'${hashes.size ? ' ' + [...hashes].join(' ') : ''}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self'; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'none'`;
+  // *.modelscope.cn: GET /asset-pack.zip redirects to cdn-lfs-cn-*.modelscope.cn; fetch() follows
+  // the redirect and CSP checks the final URL. (CSP wildcards must be a whole left-most label, so
+  // `cdn-lfs*.modelscope.cn` is invalid and Chrome blocks the request.) The zip body comes from the
+  // CDN, never from this server.
+  return `default-src 'self'; script-src 'self'${hashes.size ? ' ' + [...hashes].join(' ') : ''}; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://*.modelscope.cn; worker-src 'self' blob:; frame-src 'self'; object-src 'none'; base-uri 'none'`;
 }

@@ -1063,6 +1063,8 @@ export class Lobby {
     if (!isExperimental(experimental)) return fail(ERR.BAD_MSG);
     if (roomCapacity(mode, experimental) > MAX_SEATS && !this.supportsCapacity(session)) return fail(ERR.BAD_MSG);
     if (this.maintenance()) return fail(ERR.MAINTENANCE);
+    // 自建服邀请门禁（本项目补丁）：配置了房主链接时，只有带房主 cookie 的连接能建房；其他人仍可按房间密钥加入。
+    if (this.opts.requireHost && !session?.ws?.spIsHost) return fail(ERR.HOST_REQUIRED);
     if (this.queue.has(session)) return fail(ERR.QUEUED);
     const cur = this.roomOf(session);
     if (cur && cur.match) return fail(ERR.ROOM_STARTED, 'leave your running match first');

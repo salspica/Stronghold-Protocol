@@ -40,7 +40,7 @@ export function installPixiMaterialFallback(PIXI, options) {
         if (isTexture) {
           // The stock worker's decode error can escape its promise, and its Image branch may resolve an already
           // complete but broken image. Keep decoding inside this attempt so both failures reach the one retry.
-          const image = bitmap ? await createImageBitmap(await (await readMaterialBody(await adapter.fetch(source, { credentials: 'omit', signal }), progress)).blob())
+          const image = bitmap ? await createImageBitmap(await (await readMaterialBody(await adapter.fetch(source, { credentials: 'same-origin', signal }), progress)).blob())
             : await loadMaterialImage(source, { ...options, signal, fallback: false });
           const data = { ...asset?.data };
           data.resolution ??= PIXI.utils.getResolutionOfUrl(url);

@@ -76,6 +76,8 @@ export class MatchCombat {
   }
 
   startCombat() {
+    // 战斗二倍速 (speedVote.js): the toggles as they stand now decide this battle's pace for the whole match
+    this._applyCombatSpeed();
     if (this.clientCombat) { this._startCombatClient(); return; }
     this.phase = PHASE.COMBAT;
     const alive = this.alivePlayers();

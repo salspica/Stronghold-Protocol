@@ -425,7 +425,7 @@ class Client {
     const shop = () => this.page.evaluate(() => { const sh = globalThis.__SP__.store.get().match.private.shop; return { ids: JSON.stringify(sh.slots.map((x) => x && x.id)), free: sh.freeRefreshes }; });
     const before = await shop();
     await this.page.mouse.click(this.w / 2, this.h * 0.3); // focus the page (not a HUD button)
-    await this.page.keyboard.press('KeyR');
+    await this.page.keyboard.press('KeyD');
     const t0 = Date.now();
     let after = null; let now = null;
     while (Date.now() - t0 < 6000) {

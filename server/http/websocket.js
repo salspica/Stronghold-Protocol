@@ -74,10 +74,12 @@ function meterSocket(ws, req, traffic) {
  *   wsCompression: the resolved permessage-deflate options (wsCompression.js resolveWsCompression), false: none
  * @returns {WebSocketServer}
  */
-export function attachWebSocket(server, { network, log, wsCompression = false, traffic = null }) {
+export function attachWebSocket(server, { network, log, wsCompression = false, traffic = null, gate = null }) {
   const wss = new WebSocketServer({ noServer: true, maxPayload: WS_MAX_PAYLOAD, perMessageDeflate: wsCompression, clientTracking: false });
   wss.on('connection', (ws, req) => {
     if (traffic) meterSocket(ws, req, traffic);
+    // 自建服门禁的房主判定（由 upgrade 处理器写入 req）
+    ws.spIsHost = !!(req && req.spIsHost);
     network.handleConnection(ws, req);
   });
   wss.on('error', (e) => log.error('[ws] server error', e));
@@ -89,6 +91,12 @@ export function attachWebSocket(server, { network, log, wsCompression = false, t
       try { socket.end(`HTTP/1.1 ${status} ${text}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`); } catch { socket.destroy(); }
     };
     if (!parts || parts.rawPath !== '/ws') { reject(404, 'Not Found'); return; }
+    // 自建服邀请门禁：认房主 cookie，否则要求绑定到现存房间的访客 cookie。
+    if (gate) {
+      const verdict = gate(req);
+      req.spIsHost = verdict === 'host';
+      if (verdict === 'deny') { reject(403, 'Forbidden'); return; }
+    }
     const refused = network.admission(req);
     if (refused === 'per-address') { reject(429, 'Too Many Requests'); return; }
     if (refused) { reject(503, 'Service Unavailable'); return; }

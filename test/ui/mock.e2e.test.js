@@ -194,19 +194,19 @@ describe('in-match UI (mock harness, headless Chrome)', { skip: !ENABLED && 'set
     assert.ok(s.funds < funds0, 'bought');
     assert.equal(s.hand.filter((x) => !x).length, empty0 - 1);
     const f1 = s.funds;
-    await page.keyboard.press('KeyR');
+    await page.keyboard.press('KeyD');
     await sleep(300);
     s = await mockState(page);
-    assert.equal(s.funds, f1 - 1, 'R refreshes');
+    assert.equal(s.funds, f1 - 1, 'D refreshes');
     await page.keyboard.press('KeyF');
     await sleep(300);
     assert.equal((await mockState(page)).shop.frozen, true, 'F freezes');
     await page.evaluate(() => globalThis.__MOCK__.mutate((S) => { S.priv.funds = 40; }));
     await sleep(100);
     const lv = (await mockState(page)).shop.level;
-    await page.keyboard.press('KeyD');
+    await page.keyboard.press('KeyR');
     await sleep(300);
-    assert.equal((await mockState(page)).shop.level, lv + 1, 'D levels up');
+    assert.equal((await mockState(page)).shop.level, lv + 1, 'R levels up');
     await page.keyboard.press('Space');
     await sleep(300);
     // funds are left, so 准备 asks first (剩余资金). Confirm, then the seat is ready.
@@ -217,7 +217,7 @@ describe('in-match UI (mock harness, headless Chrome)', { skip: !ENABLED && 'set
     }
     assert.equal((await mockState(page)).ready, true, 'Space readies');
     assert.ok(await page.$('.readybtn.is-on'));
-    await page.keyboard.press('KeyR');
+    await page.keyboard.press('KeyD');
     await sleep(200);
     assert.equal((await mockState(page)).shop.frozen, true, 'no actions while ready');
     await page.keyboard.press('Space');
@@ -242,7 +242,7 @@ describe('in-match UI (mock harness, headless Chrome)', { skip: !ENABLED && 'set
       await page.click('.shopbar .lvcard');
       await page.waitForFunction(() => document.querySelector('.lvcard').getAttribute('aria-pressed') === 'true');
       assert.equal((await mockState(page)).funds, before.funds, 'selecting does not charge');
-      await page.keyboard.press('KeyD');
+      await page.keyboard.press('KeyR');
       await page.waitForFunction((lv) => globalThis.__MOCK__.S().priv.shop.level === lv + 1, {}, before.shop.level);
       const upgraded = await mockState(page);
       assert.equal(upgraded.funds, before.funds - before.shop.upgradePrice);
@@ -254,9 +254,9 @@ describe('in-match UI (mock harness, headless Chrome)', { skip: !ENABLED && 'set
       assert.equal((await mockState(page)).funds, upgraded.funds, 'the next click does not charge');
       await page.keyboard.press('Escape');
       await page.waitForFunction(() => document.querySelector('.lvcard').getAttribute('aria-pressed') === 'false');
-      await page.keyboard.press('KeyD');
+      await page.keyboard.press('KeyR');
       await page.waitForFunction((lv) => globalThis.__MOCK__.S().priv.shop.level === lv + 1, {}, upgraded.shop.level);
-      assert.equal((await mockState(page)).funds, upgraded.funds - upgraded.shop.upgradePrice, 'D still upgrades directly');
+      assert.equal((await mockState(page)).funds, upgraded.funds - upgraded.shop.upgradePrice, 'R still upgrades directly');
       // Optional art / audio may be absent; this state regression needs no asset pack.
       assert.deepEqual(problems.filter((p) => p.startsWith('pageerror:')), []);
     } finally { await page.close(); }
@@ -294,7 +294,7 @@ describe('in-match UI (mock harness, headless Chrome)', { skip: !ENABLED && 'set
       await page.click('.shopbar__cards .scard:not(.scard--sold)');
       await page.waitForSelector('.shopbar__cards .scard.is-armed');
       const selected = await page.$eval('.shopbar__cards .scard.is-armed', (el) => el.getAttribute('aria-label'));
-      await page.keyboard.press('KeyD');
+      await page.keyboard.press('KeyR');
       await page.waitForFunction((lv) => globalThis.__MOCK__.S().priv.shop.level === lv + 1, {}, before.shop.level);
       assert.equal(await page.$eval('.shopbar__cards .scard.is-armed', (el) => el.getAttribute('aria-label')), selected);
       assert.equal(await page.$eval('.lvcard', (el) => el.getAttribute('aria-pressed')), 'false');

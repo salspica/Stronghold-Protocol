@@ -96,12 +96,14 @@ const wantsTraffic = (query) => /(?:^|&)traffic(?:=(?:1|true|yes))?(?:&|$)/i.tes
  *   plugin studio (server/studio/index.js), or none
  * @returns {(req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void}
  */
-export function createRequestHandler({ serveStatic, health, log, trustProxy = 'auto', studio = null, csp = null, trustedRuntime = null }) {
+export function createRequestHandler({ serveStatic, health, log, trustProxy = 'auto', studio = null, csp = null, trustedRuntime = null, gate = null }) {
   async function handleRequest(req, res) {
     const url = req.url || '/';
     if (url.length > MAX_URL_LENGTH) { sendError(req, res, 414, '请求地址过长 · URI too long'); return; }
     const parts = splitUrl(url);
     if (!parts) { sendError(req, res, 400, '请求地址无效 · Bad request'); return; }
+    // 自建服邀请门禁（本项目补丁）：没有房主邀请，或没有绑定到现存房间的访客邀请，什么都不提供。
+    if (gate && !gate(req, res)) { sendError(req, res, 403, '需要邀请链接才能访问 · Invite link required'); return; }
     if (trustedRuntime && parts.rawPath.startsWith('/x/') && await trustedRuntime.route(req,res,parts.rawPath)) return;
     if (studio && studio.handles(parts.rawPath)) { await studio.handle(req, res, parts.rawPath, parts.query); return; }
     if (req.method !== 'GET' && req.method !== 'HEAD') {

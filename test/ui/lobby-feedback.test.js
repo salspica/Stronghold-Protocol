@@ -1,33 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { FEEDBACK_GROUP, copyFeedbackGroup } from '../../public/js/ui/lobbyFeedback.js';
 import { FEEDBACK_BOARD, STATUS_BOARD } from '../../public/js/ui/siteBoards.js';
 
 const source = path => readFileSync(new URL(path, import.meta.url), 'utf8');
 
-test('lobby feedback copies only the existing public group number', async () => {
-  const copied = [], messages = [];
-  assert.equal(FEEDBACK_GROUP, '243859707');
-  assert.equal(await copyFeedbackGroup(async text => { copied.push(text); return true; }, (...args) => messages.push(args)), true);
-  assert.deepEqual(copied, ['243859707']);
-  assert.deepEqual(messages, [['已复制反馈群号 243859707', 'success']]);
+test('the lobby feedback group is retired: no group number and no copy action', () => {
+  const feedback = source('../../public/js/ui/lobbyFeedback.js');
+  assert.match(feedback, /t\('反馈群：已跑路'\)/);
+  assert.doesNotMatch(feedback, /243859707|copyText|copyFeedbackGroup|onClick|href=|window\.open|2225664821|net\.request|localStorage/);
+  const en = JSON.parse(source('../../public/i18n/en.json'));
+  assert.ok(Object.hasOwn(en, '反馈群：已跑路'));
 });
 
-for (const mode of ['unavailable', 'denied']) test(`lobby feedback ${mode} does not claim successful copying`, async () => {
-  const messages = [];
-  const copy = async text => { assert.equal(text, '243859707'); if (mode === 'denied') throw new Error('denied'); return false; };
-  assert.equal(await copyFeedbackGroup(copy, (...args) => messages.push(args)), false);
-  assert.deepEqual(messages, [['复制失败，请手动复制', 'warn']]);
-});
-
-test('feedback remains visible outside optional announcements, with a number-only accessible button', () => {
-  const lobby = source('../../public/js/screens/lobby.js'), feedback = source('../../public/js/ui/lobbyFeedback.js');
+test('feedback remains visible outside optional announcements', () => {
+  const lobby = source('../../public/js/screens/lobby.js');
   assert.match(lobby, /<div class="hub-contact"><div class="hub-contact__row"><\$\{LobbyFeedback\} \/><\$\{SiteBoards\} \/><\/div>/);
-  assert.match(feedback, /aria-label=\$\{t\('反馈 QQ 群：\{group\}，点击复制群号'/);
-  assert.match(feedback, />\$\{FEEDBACK_GROUP\}<\/\/>/);
-  assert.doesNotMatch(feedback, /href=|window\.open|2225664821|net\.request|localStorage/);
-  assert.match(feedback, /copied \? 'success' : 'warn'/);
   const css = source('../../public/css/screens/lobby.css');
   assert.match(css, /\.lobby-feedback \{[^}]*min-height: 40px/);
 });

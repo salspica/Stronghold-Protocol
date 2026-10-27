@@ -1,0 +1,56 @@
+/* In-match leaderboard: one floating icon on the right edge, opening a draggable window (ui/rankBoard.js). */
+.rank-board { position: static; pointer-events: none; color: var(--text-hi); }
+.gm__hud > .rank-board { pointer-events: none; }
+.rank-board__fab { position: fixed; z-index: 45; display: grid; place-items: center; width: 44px; height: 44px; border: 1px solid var(--line-3); border-radius: 50%; background: var(--bg-1); color: var(--text-hi); box-shadow: 0 .08rem .2rem rgba(0, 0, 0, .4); cursor: grab; pointer-events: auto; touch-action: none; }
+.rank-board__fab:hover { color: var(--mint-400); border-color: var(--mint-700); }
+.rank-board__fab > .icon { width: max(.2rem, calc(18px * var(--ui))); height: max(.2rem, calc(18px * var(--ui))); }
+.rank-board__panel { position: fixed; z-index: 45; display: flex; flex-direction: column; width: min(340px, calc(100vw - 24px)); height: clamp(300px, 58dvh, 560px); max-height: calc(100vh - 16px); padding: .16rem; border: 1px solid var(--line-3); border-top: 2px solid var(--mint-700); background: var(--bg-1); box-shadow: 0 .12rem .3rem rgba(0, 0, 0, .35); font-size: max(calc(.14 * var(--t)), calc(12px * var(--ui))); pointer-events: auto; }
+.rank-board__header { flex: none; display: flex; align-items: center; gap: .1rem; cursor: grab; touch-action: none; user-select: none; }
+.rank-board__panel.is-dragging .rank-board__header { cursor: grabbing; }
+.rank-board__panel > header { display: flex; flex: none; align-items: center; gap: .1rem; }
+.rank-board__heading { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: .025rem; }
+.rank-board__eyebrow { color: var(--text-lo); font-size: max(calc(.105 * var(--t)), calc(9px * var(--ui))); letter-spacing: .12em; }
+.rank-board__heading > strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: max(calc(.18 * var(--t)), calc(14px * var(--ui))); font-weight: 600; }
+.rank-board__status { display: flex; align-items: center; gap: .04rem; padding: .03rem .06rem; border: 1px solid var(--line); color: var(--text-md); font-size: max(calc(.12 * var(--t)), calc(10px * var(--ui))); white-space: nowrap; }
+.rank-board__status > .icon { width: max(.13rem, calc(12px * var(--ui))); height: max(.13rem, calc(12px * var(--ui))); }
+.rank-board__close { flex: none; width: max(.3rem, calc(28px * var(--ui))); height: max(.3rem, calc(28px * var(--ui))); display: grid; place-items: center; border: 0; color: var(--text-lo); background: transparent; cursor: pointer; }
+.rank-board__close:hover { color: var(--text-hi); background: var(--bg-2); }
+.rank-board__close > .icon { width: 16px; height: 16px; }
+.rank-board__tabs { flex: none; display: grid; grid-template-columns: 1fr 1fr; margin-top: .08rem; border: 1px solid var(--line); }
+.rank-board__tabs > button { min-width: 0; min-height: max(.32rem, calc(28px * var(--ui))); padding: 0 .05rem; border: 0; background: transparent; color: var(--text-md); font: inherit; font-size: max(calc(.125 * var(--t)), calc(11px * var(--ui))); cursor: pointer; white-space: nowrap; }
+.rank-board__tabs > button:nth-child(even) { border-left: 1px solid var(--line); }
+.rank-board__tabs > button:nth-child(n + 3) { border-top: 1px solid var(--line); }
+.rank-board__tabs > button.is-on { background: var(--mint-500); color: var(--text-on-mint); font-weight: 600; }
+.rank-board__meta { flex: none; display: flex; align-items: baseline; justify-content: space-between; gap: .08rem; padding: .1rem 0 .06rem; color: var(--text-lo); font-size: max(calc(.115 * var(--t)), calc(10px * var(--ui))); }
+.rank-board__meta > small { color: var(--text-md); }
+.rank-board__rows { flex: 1 1 auto; min-height: 0; margin: 0; padding: 3px 2px; overflow-y: auto; list-style: none; scrollbar-width: thin; scrollbar-color: var(--line-3) transparent; }
+.rank-board__rows > li + li { border-top: 1px solid var(--line); }
+.rank-board__row { display: flex; align-items: flex-start; gap: .08rem; padding: max(.06rem, calc(5px * var(--ui))) 0; }
+.rank-board__row.is-me { background: var(--mint-a10); }
+.rank-board__row.is-out { opacity: .55; }
+.rank-board__rank { flex: none; min-width: 1.25em; padding-top: 1px; color: var(--text-lo); font-size: max(calc(.12 * var(--t)), calc(11px * var(--ui))); text-align: center; }
+.rank-board__rank.is-top { color: var(--text-hi); font-weight: 600; }
+.rank-board__rank.is-top-1 { color: #e8c46a; }
+.rank-board__rank.is-top-2 { color: #c8d2dc; }
+.rank-board__rank.is-top-3 { color: #d49a6a; }
+.rank-board__body { flex: 1; min-width: 0; }
+.rank-board__label { display: flex; align-items: baseline; gap: .08rem; }
+.rank-board__name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-md); font-size: max(calc(.14 * var(--t)), calc(12px * var(--ui))); }
+.rank-board__value { flex: none; color: var(--text-hi); font-size: max(calc(.15 * var(--t)), calc(12px * var(--ui))); white-space: nowrap; }
+.rank-board__meter { display: flex; align-items: center; margin-top: .055rem; }
+.rank-board__bar { flex: 1; display: block; height: 4px; overflow: hidden; background: var(--mint-a10); }
+.rank-board__bar > i { display: block; height: 100%; width: 100%; border-radius: 0 4px 4px 0; background: var(--mint-700); transform-origin: left; transition: transform .16s ease; }
+.rank-board__sub { display: block; margin-top: .035rem; color: var(--text-lo); font-size: max(calc(.105 * var(--t)), calc(10px * var(--ui))); }
+.rank-board__empty { flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; gap: .08rem; padding: .24rem .08rem; color: var(--text-lo); text-align: center; }
+.rank-board__empty > .icon { width: 24px; height: 24px; }
+.rank-board__empty > strong { color: var(--text-md); font-size: max(calc(.15 * var(--t)), calc(12px * var(--ui))); font-weight: 500; }
+.rank-board__empty > span { font-size: max(calc(.115 * var(--t)), calc(11px * var(--ui))); }
+.rank-board__fab:focus-visible, .rank-board__close:focus-visible, .rank-board__tabs > button:focus-visible { outline: 2px solid var(--mint-500); outline-offset: 2px; }
+@media (max-width: 900px) {
+  .rank-board__panel { width: min(86vw, calc(300px * var(--ui))); height: min(64dvh, 520px); padding: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .rank-board__bar > i { transition: none; } }
+@media (forced-colors: active) {
+  .rank-board__bar { border: 1px solid CanvasText; background: Canvas; }
+  .rank-board__bar > i { forced-color-adjust: none; background: repeating-linear-gradient(135deg, CanvasText 0 2px, Canvas 2px 4px); }
+}

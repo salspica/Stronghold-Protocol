@@ -9,6 +9,14 @@ import { bondList, offBondCounts } from '../bondsMeta.js';
 import { bountyText, bountyCard } from '../choices.js';
 import { layerForecast } from '../layerForecast.js';
 
+/** Copies of a chess still in this seat's pool (its own 自选 stock for a slotted piece), or null when untracked. */
+function poolLeft(ps, id) {
+  if (typeof id !== 'string') return null;
+  const base = ps.gd.baseIdOf(id);
+  const pool = typeof ps.poolOf === 'function' ? ps.poolOf(base) : ps.pool;
+  return pool && pool.has(base) ? pool.left(base) : null;
+}
+
 export class PlayerViews {
   pieceView(p, rc = null) {
     const rec = p.kind === 'item' ? this.gd.item(p.id) : p.kind === 'token' ? this.gd.token(p.id) : this.gd.chess(p.id);
@@ -59,7 +67,13 @@ export class PlayerViews {
   }
 
   privateView() {
-    const slots = this.shop.slots.map((s) => (s ? { kind: s.kind, id: s.id, price: this.priceOf(s), basePrice: s.basePrice, sold: !!s.sold, frozen: !!s.frozen } : null));
+    const slots = this.shop.slots.map((s) => {
+      if (!s) return null;
+      const v = { kind: s.kind, id: s.id, price: this.priceOf(s), basePrice: s.basePrice, sold: !!s.sold, frozen: !!s.frozen };
+      // 剩余 n 张 on the card (a chess only): the copies still in this seat's pool
+      if (s.kind !== 'item') { const left = poolLeft(this, s.id); if (left != null) v.left = left; }
+      return v;
+    });
     const offer = this.offers[0] || null;
     const free = this.shop.freeRefreshes > 0;
     const board = [];
@@ -101,7 +115,11 @@ export class PlayerViews {
         slots,
         // `source` 'merge' = the promotion reward (晋升奖励); any other offer (a strategy, an item, a 特质) carries the
         // `label` the bar shows instead; `queued` = offers waiting behind it (player report #6 after 0.1.0)
-        rewardOffer: offer ? { tier: offer.tier, source: offer.source === 'merge' ? 'merge' : 'special', label: offer.label || null, queued: this.offers.length - 1, slots: offer.slots.map((s) => ({ kind: s.kind === 'item' ? 'item' : 'chess', id: s.id, price: s.price, sold: !!s.sold })) } : null,
+        rewardOffer: offer ? { tier: offer.tier, source: offer.source === 'merge' ? 'merge' : 'special', label: offer.label || null, queued: this.offers.length - 1, slots: offer.slots.map((s) => {
+          const v = { kind: s.kind === 'item' ? 'item' : 'chess', id: s.id, price: s.price, sold: !!s.sold };
+          if (s.kind !== 'item') { const left = poolLeft(this, s.id); if (left != null) v.left = left; }
+          return v;
+        }) } : null,
       },
       hand: this.hand.map((p) => (p ? this.pieceView(p) : null)),
       temp: this.temp.map((p) => (p ? this.pieceView(p) : null)),

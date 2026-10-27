@@ -88,7 +88,9 @@ import { BondStrip, BondPopup } from '../ui/bondStrip.js';
 import { TeamPanel, useRoster } from '../ui/teamPanel.js';
 import { Danmaku } from '../ui/danmaku.js';
 import { DamageBoard, uniteDamageOwners, bossDamageOwners } from '../ui/damageBoard.js';
+import { RankBoard } from '../ui/rankBoard.js';
 import { ShopBar } from '../ui/shopBar.js';
+import { BondTrackPicker } from '../ui/trackBonds.js';
 import { DetailPanel, resolveDetail } from '../ui/detailPanel.js';
 import { RewardOverlay } from '../ui/rewardOverlay.js';
 import { FinalAssaultPlate, HiddenCorePlate, EndPlate, preloadBossPlateArt, bossPlateArtReady, finalPlateRows, endPlateOf } from '../ui/bossPlates.js';
@@ -233,8 +235,18 @@ function MatchScreen() {
   // deals duplicates) carry the same chess id and no piece, and each must say its 选中干员 (detailPanel selectVoiceKey)
   const cardTap = useRef(0);
   const [collapsed, setCollapsed] = useState(false);
+  // 盟约追踪 (ui/trackBonds.js): the player's own bond watch list — a client-only shop / reward highlight, never uploaded
+  const [trackOpen, setTrackOpen] = useState(false);
+  const [trackedBonds, setTrackedBonds] = useState(() => new Set());
+  const toggleTrackedBond = useCallback((bondId) => {
+    setTrackedBonds((prev) => {
+      const next = new Set(prev);
+      if (next.has(bondId)) next.delete(bondId); else next.add(bondId);
+      return next;
+    });
+  }, []);
   // GitHub #501: a g.refresh is still waiting for its reply — the shop's 刷新 button dims while it is (gameActions.js
-  // single-flights the intent; the R hotkey is dropped by the same guard)
+  // single-flights the intent; the refresh (D) hotkey is dropped by the same guard)
   const [refreshBusy, setRefreshBusy] = useState(false);
   useEffect(() => onRefreshBusy(setRefreshBusy), []);
   const [rewardMin, setRewardMin] = useState(false);
@@ -246,6 +258,8 @@ function MatchScreen() {
   useEffect(() => { if (!showMetrics) setMetricsOpen(false); }, [showMetrics]);
   const [emoteOpen, setEmoteOpen] = useState(false);
   const [damageOpen, setDamageOpen] = useState(false);
+  // the floating leaderboard (ui/rankBoard.js): one icon on the right edge, opening a draggable window
+  const [rankOpen, setRankOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [exitOpen, setExitOpen] = useState(false);
   const [drag, setDrag] = useState(null);                // { uid, kind, id } while dragging a piece
@@ -274,6 +288,8 @@ function MatchScreen() {
   const battleState = useStore((s) => s.match.battle, shallowEqual); // local battle runner (client-side combat)
 
   const phase = pub?.phase;
+  // 盟约追踪: the picker belongs to the prep; a phase change closes it (the selection itself stays for the match)
+  useEffect(() => { if (phase !== PHASE.PREP) setTrackOpen(false); }, [phase]);
   const mode = phaseMode(phase);
   const combat = isCombatPhase(phase);
   const solo = roomSolo || String(pub?.modeId || '').includes('single');
@@ -375,7 +391,7 @@ function MatchScreen() {
     getChess: (id) => { const c = gd.chess(id); return ownDiyRecord(c, priv, { chess: data.get('chess'), backups: data.get('backups') }) || c; },
     getToken: gd.token, getItem: gd.item, getEffect: gd.effect, backups: gd.backups, morphMode,
   }), [priv, pub?.stageId, editable, gd.ready, deployField, data.locale(), morphMode]);
-  live.current = { pub, priv, field, view, editable, hasPersonalChoice, placeCtx, watching, watchWho, watchingOther, home, myId, alive, spectator, detail, drawer, bondOpen, emoteOpen, damageOpen, settingsOpen, exitOpen, drag, facing, sel, selBusy, pen, collapsedNow: collapsed, localDone: false, canPause: false, paused };
+  live.current = { pub, priv, field, view, editable, hasPersonalChoice, placeCtx, watching, watchWho, watchingOther, home, myId, alive, spectator, detail, drawer, bondOpen, emoteOpen, damageOpen, rankOpen, settingsOpen, exitOpen, drag, facing, sel, selBusy, pen, collapsedNow: collapsed, localDone: false, canPause: false, paused };
 
   // ---- camera: every request goes through setCam, which remembers it for the pen's way back -----------------------
   // the own prep board: the normal board, or — in the prep of a boss round — the player's half of the boss field
@@ -1514,6 +1530,7 @@ function MatchScreen() {
       if (act === 'escape') {
         if (L.emoteOpen) setEmoteOpen(false);
         else if (L.damageOpen) setDamageOpen(false);
+        else if (L.rankOpen) setRankOpen(false);
         else if (L.pen && !L.detail) togglePenRef.current(false);
         else if (L.bondOpen) setBondOpen(null);
         else if (L.detail) setDetail(null);
@@ -1742,7 +1759,8 @@ function MatchScreen() {
         pen=${pen} penAvail=${penAvail} onPen=${togglePen} config=${gd.config} frozenAt=${frozenAt}
         pause=${canPause || paused ? { show: canPause, paused, busy: pauseBusy, onToggle: () => togglePause(!paused) } : null}
         live=${liveLpNow} spectator=${spectator}
-        spectators=${specFacts.list} myId=${myId} isHost=${specFacts.isHost} onRemoveSpectator=${removeSpectator} room=${modRoom} />
+        spectators=${specFacts.list} myId=${myId} isHost=${specFacts.isHost} onRemoveSpectator=${removeSpectator} room=${modRoom}
+        onSpeedVote=${(on) => actions.speedVote(on)} />
 
       <div class="gm__bonds">
         <button type="button" class="bonds-toggle" aria-expanded=${!bondsCollapsed} aria-controls="match-bond-strip"
@@ -1767,6 +1785,8 @@ function MatchScreen() {
         observe=${cc ? { canObserve: (p) => observeTarget(p, pub, myId, { observing: watchingOther, ownDone: localDone }), observing: watchingOther, onBack: backHome } : null}
         halves=${layers.length ? { half: avatarHalf, onHalf: avatarPick } : null} />
 
+      <${RankBoard} pub=${pub} snapshot=${damage} players=${players} myId=${myId} open=${rankOpen} onToggle=${setRankOpen} />
+
       <div class="gm__effects"><${EffectsList} effects=${watchingOther && field ? (field.effects ?? null) : priv?.effects} /></div>
 
       ${watchingOther && !combat ? html`<div class="gm__watching" role="status">
@@ -1775,7 +1795,8 @@ function MatchScreen() {
       </div>` : null}
 
       ${showShop ? html`<${ShopBar} priv=${priv} editable=${editable} collapsed=${collapsed} refreshBusy=${refreshBusy} onCollapse=${setCollapsed}
-        barRef=${barRef} offBonds=${offBonds}
+        barRef=${barRef} offBonds=${offBonds} trackedBonds=${trackedBonds}
+        track=${phase === PHASE.PREP && !spectator ? { count: trackedBonds.size, onOpen: () => setTrackOpen(true) } : null}
         onBuy=${buy} onLevel=${() => actions.levelUp()} onRefresh=${() => actions.refresh()} onFreeze=${() => actions.freeze()}
         onDetail=${(id, kind, hint) => setDetail({ kind: kind === 'item' ? 'item' : 'chess', id, hint: hint || null, tap: ++cardTap.current })}
         onDetailClose=${() => setDetail((d) => (d?.kind === 'chess' || d?.kind === 'item' ? null : d))}
@@ -1785,6 +1806,9 @@ function MatchScreen() {
 
       ${phase === PHASE.PREP && priv?.shop?.rewardOffer ? html`<${RewardOverlay} priv=${priv} minimized=${rewardMin || collapsed}
         onMinimize=${(m) => { setRewardMin(m); if (!m) setCollapsed(false); }} />` : null}
+
+      <${BondTrackPicker} open=${trackOpen} onClose=${() => setTrackOpen(false)} bonds=${gd.list('bonds')}
+        values=${trackedBonds} off=${offBonds} onToggle=${toggleTrackedBond} onClear=${() => setTrackedBonds(new Set())} />
 
       ${combat || mode === 'settle' ? html`<${CombatHud} pub=${pub} myId=${myId} watching=${watchingNow} hud=${hud} myDone=${!!myDone && alive}
         spectating=${!alive} spectator=${spectator} onWatch=${watchField}

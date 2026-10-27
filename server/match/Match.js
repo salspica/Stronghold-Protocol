@@ -225,6 +225,7 @@
 //   phases.js        INFO_CHECK, BAND_DRAFT (the strategy draft), BATTLE_CHECK, ROUND_START
 //   setupVote.js     the INFO_CHECK opening reroll vote (重刷本局) and its transactional setup replacement
 //   kickVote.js      投票移出: the vote to remove a teammate under the offline takeover
+//   speedVote.js     战斗二倍速: each human's toggle and the doubled pace of the next battle phase
 //   spDraft.js       SP_DRAFT (机变) and the rolls the meta effects ask for (bounties, item ids, pools)
 //   prep.js          PREP: its start, the AI seats' sliced preps, Ready, the deadline, its end
 //   combat.js        battle construction, COMBAT (both modes), the per-field results, then 联防 or SETTLE
@@ -246,6 +247,7 @@ import { PHASE, modeIdFor } from '../../shared/constants.js';
 import { experimentalOptions } from '../../shared/experimental.js';
 import { roomCapacity } from '../../shared/playerCapacity.js';
 import { createDamageBoard } from './damageBoard.js';
+import { createRankBoard } from './rankBoard.js';
 import { MatchExtensions } from './match/extensions.js';
 import { isContentHash } from '../../shared/plugins/identity.js';
 import { Battle } from '../sim/Battle.js';
@@ -268,6 +270,7 @@ import { MatchPause } from './match/pause.js';
 import { MatchPhases } from './match/phases.js';
 import { MatchSetupVote } from './match/setupVote.js';
 import { MatchKickVote } from './match/kickVote.js';
+import { MatchSpeedVote } from './match/speedVote.js';
 import { MatchSpDraft } from './match/spDraft.js';
 import { MatchPrep } from './match/prep.js';
 import { MatchCombat } from './match/combat.js';
@@ -368,6 +371,10 @@ export class Match {
     this.battleContent = opts.battleContent || 'full';
     this.timerScale = Number.isFinite(opts.timerScale) && opts.timerScale >= 0 ? opts.timerScale : 1;
     this.gameSpeed = Number.isFinite(opts.combatSpeed) && opts.combatSpeed > 0 ? Math.min(opts.combatSpeed, 200) : GAME_SPEED;
+    /** 战斗二倍速 (match/speedVote.js): the seat ids that toggled it on, the applied multiplier and the normal speed it doubles */
+    this._speedVotes = new Set();
+    this._speedBoost = 1;
+    this._speedBase = null;
     this.snapshotHz = parseSnapshotHz(opts.snapshotHz ?? env('SP_SNAPSHOT_HZ'));
     /** server-run combat: own fields as local display replicas for browsers that declared g.sim (localReplica.js) */
     this.localReplica = opts.localReplica != null ? !!opts.localReplica : String(env('SP_LOCAL_REPLICA') ?? '').trim() !== '0';
@@ -445,6 +452,8 @@ export class Match {
      */
     this.battlePrefix = `${this.seed.toString(36)}${Number.isInteger(opts.matchNo) && opts.matchNo > 0 ? `-${opts.matchNo.toString(36)}` : ''}`;
     this.damageBoard = createDamageBoard(this.battlePrefix);
+    /** Current-scope per-player output for the leaderboard (m.damage.ranks); the complete ledger is damageBoard. */
+    this.rankBoard = createRankBoard();
     this._damageDirty = false;
     this._damageTimer = null;
     this._damageAt = -Infinity;
@@ -635,7 +644,7 @@ export class Match {
 }
 
 // the method modules, in this order (a name defined twice is an error, never a silent override)
-for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchSetupVote, MatchKickVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchLocalReplica, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchExtensions, MatchTestCommands, MatchOffers]) {
+for (const part of [MatchPlatform, MatchInfra, MatchMessaging, MatchViews, MatchWatch, MatchIntents, MatchPause, MatchPhases, MatchSetupVote, MatchKickVote, MatchSpeedVote, MatchSpDraft, MatchPrep, MatchCombat, MatchClientCombat, MatchLocalReplica, MatchRehearsal, MatchReports, MatchUnite, MatchBoss, MatchSettle, MatchExtensions, MatchTestCommands, MatchOffers]) {
   for (const key of Reflect.ownKeys(part.prototype)) {
     if (key === 'constructor') continue;
     if (Object.prototype.hasOwnProperty.call(Match.prototype, key)) throw new Error(`Match.${String(key)} is defined twice`);

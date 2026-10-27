@@ -230,6 +230,17 @@ always. While paused (`m.public.paused`) the field clocks, the authority deadlin
 fields' `startAt` / `lastProgressAt` and the boss start by the paused time and re-arms the timers. A disconnect or
 `onLeave` resumes; the battle phase ending clears it (`pausedMs` totals the paused time).
 
+### 1.3b Battle speed toggles (战斗二倍速)
+`g.speedVote { on }` (`MatchSpeedVote`, `match/speedVote.js`): each alive connected human seat toggles it freely at any
+time (an eliminated, disconnected, bot or spectator seat cannot). It is not a timed vote: `MatchCombat.startCombat` and
+`MatchBoss.startFinalAssault` apply the tally when the battle starts — at least half of the connected alive humans
+(rounded up) on ⇒ the whole match fights that phase at twice the game speed, else the normal speed is restored. The
+simulation step, event boundaries and golden results are unchanged; the field clock, deadlines, boss overtime and the
+`b.start.speed` every client receives follow it, and a 联防 keeps the round's pace. `m.public.speedVote` (PREP and the
+battle phases) is `{ on: [playerId], count, voters, need, doubled, active, boost }`; the toggles survive a checkpoint.
+The client's countdown gauge divides its total by `boost`. The 2× button (`ui/hud.js SpeedVoteButton`) sits left of the
+top-right clock.
+
 ### 1.4 Watching fields
 Client-side combat (the default, DESIGN §14 Spectating; `Match._watchClient`): `g.watch` answers with the field's
 `b.start` (a display replica fast-forwarded to the field clock); an alive player may not watch another normal field

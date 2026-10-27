@@ -103,6 +103,10 @@ export async function startServer(opts = {}) {
     ? requestedTrials : 0;
   const { publicDir, dataDir, sharedDir, packsDir, pluginsDir } = serveDirs(opts);
   const simDir = path.join(ROOT, 'server', 'sim');
+  // 自建服邀请门禁（本项目补丁）：SP_HOST_KEY(?invite=…) 为房主链接，SP_GUEST_KEY(?invite=…&room=CODE) 仅在该房间
+  // 存在时有效。cookie 由本进程下发；Caddy 只读取判断。
+  const hostKey = String(process.env.SP_HOST_KEY ?? '').trim();
+  const guestKey = String(process.env.SP_GUEST_KEY ?? '').trim();
 
   // The process-wide singleton serves the default data dir; a custom dir (tests) gets its own copy.
   const data = opts.dataDir ? loadData(dataDir, { log }) : getData({ dir: dataDir, log });
@@ -158,7 +162,7 @@ export async function startServer(opts = {}) {
     // an out-of-memory abort in a worker thread ends the whole server)
     const transport = String(process.env.SP_MATCH_HOST || '').trim().toLowerCase() === 'worker' ? 'worker' : 'process';
     hosts = createMatchHosts({ contents, log, options: { transport, maxWorkers: Math.max(1, policy.get().maxSets), ...(opts.matchHost || {}) } });
-    ({ registry, lobby, network } = createSessionStack({ ...opts, snapshotHz }, {
+    ({ registry, lobby, network } = createSessionStack({ ...opts, snapshotHz, requireHost: !!hostKey }, {
       data, log, combatPool, trialPool, onlineLimit, ownerFile, content, plugins: roomSets, hosts,
       getLoadState: () => serverLoadState(healthMetrics?.snapshot?.()),
       getLoadDetails: () => publicLoadDetails(healthMetrics?.snapshot?.()),
@@ -190,10 +194,56 @@ export async function startServer(opts = {}) {
   const health = { startedAt, network, registry, lobby, content, browserBuild, combatPool, trialPool, trialStartupFailed,
     getHealthMetrics: () => healthMetrics, traffic, assetIndex, views, trusted: trustedRuntime?.health,
     persistence: persistence ? () => persistence.snapshot() : null };
+
+  // —— 自建服邀请门禁（本项目补丁）——
+  const gateOn = !!(hostKey || guestKey);
+  /** 浏览器以「不带凭据」方式抓取，永远拿不到门禁 cookie；另两个是无敏感信息的健康检查。 */
+  const GATE_EXEMPT = new Set(['/manifest.json', '/sw.js', '/healthz', '/client-build']);
+  const cookieHeader = (kv, maxAge = 31_536_000) => `${kv}; Path=/; Max-Age=${maxAge}; HttpOnly; Secure; SameSite=Lax`;
+  function cookieValue(header, name) {
+    if (!header) return '';
+    for (const part of String(header).split(';')) {
+      const i = part.indexOf('=');
+      if (i > 0 && part.slice(0, i).trim() === name) return part.slice(i + 1).trim();
+    }
+    return '';
+  }
+  const roomExists = (code) => !!(code && lobby?.getRoom?.(code));
+  /** HTTP 门禁。@returns {boolean} 是否放行（false ⇒ 403）。 */
+  function gate(req, res) {
+    if (!gateOn) return true;
+    let params = null;
+    try { params = new URL(req.url || '/', 'http://localhost'); } catch { /* keep null */ }
+    if (!params || GATE_EXEMPT.has(params.pathname)) return true;
+    const invite = params.searchParams.get('invite') || '';
+    if (hostKey && invite === hostKey) { res?.appendHeader('Set-Cookie', cookieHeader(`sp_gate=${hostKey}`)); return true; }
+    const g = cookieValue(req.headers.cookie, 'sp_gate');
+    if (hostKey && g === hostKey) return true;
+    const isGuest = !!guestKey && (invite === guestKey || g === guestKey);
+    if (!isGuest) return false;
+    const qRoom = (params.searchParams.get('room') || '').trim().toUpperCase();
+    const cRoom = cookieValue(req.headers.cookie, 'sp_room').trim().toUpperCase();
+    if (!roomExists(qRoom || cRoom)) return false;
+    if (qRoom && res) {
+      res.appendHeader('Set-Cookie', cookieHeader(`sp_gate=${guestKey}`));
+      res.appendHeader('Set-Cookie', cookieHeader(`sp_room=${qRoom}`));
+    }
+    return true;
+  }
+  /** WebSocket 升级门禁。@returns {'open'|'host'|'guest'|'deny'} */
+  function wsGate(req) {
+    if (!gateOn) return 'open';
+    const g = cookieValue(req.headers.cookie, 'sp_gate');
+    if (hostKey && g === hostKey) return 'host';
+    const cRoom = cookieValue(req.headers.cookie, 'sp_room').trim().toUpperCase();
+    if (guestKey && g === guestKey && roomExists(cRoom)) return 'guest';
+    return 'deny';
+  }
+
   const server = http.createServer(createRequestHandler({ serveStatic, csp: process.env.SP_CSP === 'off' ? null : siteCsp(publicDir), health, log,
-    trustProxy: network.opts.trustProxy, studio, trustedRuntime }));
+    trustProxy: network.opts.trustProxy, studio, trustedRuntime, gate }));
   server.on('clientError', answerClientError);
-  const wss = attachWebSocket(server, { network, log, wsCompression, traffic });
+  const wss = attachWebSocket(server, { network, log, wsCompression, traffic, gate: wsGate });
 
   // The address actually bound. The default may fall back to IPv4; the returned host and url follow that.
   let boundHost;

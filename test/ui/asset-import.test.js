@@ -8,8 +8,8 @@ import { rewriteManifest } from '../../server/http/assetViews.js';
 import { siteCsp, SIM_WORKER_CSP } from '../../server/http/csp.js';
 import { createAssetDownload } from '../../public/js/assetDownload.js';
 import {
-  IMPORTED_ASSET_CACHE, IMPORTED_ASSET_CACHE_PREFIX, IMPORTED_ASSET_PATH, IMPORTED_INDEX_URL, MATERIAL_CACHE_PREFIX, assetWorkerUrl,
-  addImportedPaths, askPersistStorage, countImportedFiles, importSupport, listImportedPaths, pruneImportedPaths, shouldServeImportedAsset,
+  IMPORTED_ASSET_CACHE, IMPORTED_ASSET_CACHE_PREFIX, IMPORTED_ASSET_PATH, IMPORTED_INDEX_URL, IMPORT_COMPLETE_URL, MATERIAL_CACHE_PREFIX, assetWorkerUrl,
+  addImportedPaths, askPersistStorage, clearImportedAssets, countImportedFiles, importSupport, importedInFull, listImportedPaths, pruneImportedPaths, shouldServeImportedAsset,
   storagePersisted,
 } from '../../public/js/assetCache.js';
 import {
@@ -139,7 +139,7 @@ function memoryCache({ keysLimit = Infinity } = {}) {
     async keys() { return [IMPORTED_ASSET_CACHE]; },
     async delete() { store.clear(); return true; },
   };
-  const assets = () => [...store.keys()].filter((url) => url !== IMPORTED_INDEX_URL);
+  const assets = () => [...store.keys()].filter((url) => url !== IMPORTED_INDEX_URL && url !== IMPORT_COMPLETE_URL);
   return { caches, store, assets };
 }
 
@@ -273,6 +273,54 @@ test('zip: stored, deflate, data descriptor, bad crc, unsupported method, trunca
   assert.ok(cdAt > 0 && entry.ok);
 });
 
+test('the importer skips the CRC pass: SHA-256 against the manifest is the same proof, for a fifth of the CPU', async () => {
+  const raw = bytesOf('crc-is-redundant');
+  const zip = buildZip([{ name: 'public/assets/a.png', raw, crc: 1 }]);
+  const strict = await openZip(zip);
+  assert.equal((await strict.read(strict.entries[0])).code, 'bad-entry', 'the public reader still verifies');
+  const loose = await openZip(zip, { verifyCrc: false });
+  assert.equal(loose.ok, true);
+  assert.deepEqual((await loose.read(loose.entries[0])).bytes, raw);
+});
+
+test('files are hashed and stored a few at a time, not one await per file: the Cache Storage write is the slow part', async () => {
+  const zips = [];
+  const map = {};
+  const manifest = {};
+  for (let i = 0; i < 12; i++) {
+    const raw = bytesOf(`file-${i}`);
+    map[`assets/f${i}.png`] = hash16(raw);
+    manifest[`f${i}`] = `/assets/f${i}.png`;
+    zips.push({ name: `pack/public/assets/f${i}.png`, raw });
+  }
+  const view = rewriteManifest(manifest, 'assets.json', indexFor(map));
+  const mc = memoryCache();
+  let inFlight = 0;
+  let peak = 0;
+  const slowCaches = {
+    keys: (...args) => mc.caches.keys(...args),
+    delete: (...args) => mc.caches.delete(...args),
+    async open(name) {
+      const inner = await mc.caches.open(name);
+      return {
+        ...inner,
+        async put(url, response) {
+          inFlight += 1;
+          peak = Math.max(peak, inFlight);
+          await new Promise((resolve) => setTimeout(resolve, 5));
+          try { return await inner.put(url, response); } finally { inFlight -= 1; }
+        },
+      };
+    },
+  };
+  const imp = createAssetImport({ fetch: manifestFetch(view.doc).fetch, caches: slowCaches });
+  await imp.start({ type: 'zip', data: buildZip(zips) });
+  assert.equal(imp.get().phase, 'complete');
+  assert.equal(imp.get().accepted, 12);
+  assert.ok(peak > 1, 'more than one cache.put is in flight');
+  assert.ok(peak <= 4, `the queue is bounded (peak ${peak})`);
+});
+
 test('served spine plan includes the default page and local groups sort like the server', () => {
   const skel = bytesOf('skel');
   const atlas = bytesOf('atlas');
@@ -334,6 +382,7 @@ test('import keeps a matching file and its /media alias, and rejects a mismatch'
   });
   assert.equal(imp.get().phase, 'complete');
   assert.equal(imp.get().accepted, 1);
+  assert.equal(await importedInFull(caches), true, 'a complete run leaves the marker the settings read');
   assert.deepEqual(calls.map((c) => c.url), ['/data/assets.json', '/data/local-assets.json', '/data/local-fx.json']);
   const urls = cacheUrlsFor(planFromManifests(view.doc, null).files.get('assets/audio/bgm/a.mp3').url);
   assert.equal(urls[1], `/media/~${hash}/bgm/a`);
@@ -352,7 +401,10 @@ test('import keeps a matching file and its /media alias, and rejects a mismatch'
   assert.equal(bad.get().rejected, 1);
   assert.equal(bad.get().accepted, 0);
   assert.equal(other.store.size, 0);
+  assert.equal(await importedInFull(other.caches), false, 'a partial run does not mark the origin');
   assert.equal(wrong.get().phase, 'idle');
+  await clearImportedAssets(caches);
+  assert.equal(await importedInFull(caches), false, 'clearing the imported assets turns the buttons back on');
 });
 
 test('a spine group is stored only when every member matches the model hash', async () => {
@@ -437,7 +489,7 @@ test('a file the manifest does not list is skipped, and a bad zip stops the impo
   assert.equal(imp.get().phase, 'complete');
   assert.equal(imp.get().accepted, 1);
   assert.ok(imp.get().skipped >= 2);
-  assert.deepEqual([...store.keys()].filter((url) => url !== IMPORTED_INDEX_URL).length, 1);
+  assert.deepEqual([...store.keys()].filter((url) => url !== IMPORTED_INDEX_URL && url !== IMPORT_COMPLETE_URL).length, 1);
   assert.equal(calls.length, 3);   // assets.json, local-assets.json, local-fx.json (DESIGN §33)
   assert.equal(imp.get().localMissing, undefined);
 
@@ -967,14 +1019,22 @@ test('the import index merges imports, seeds itself from the keys once, and neve
   assert.deepEqual([...await listImportedPaths(mem.caches)], ['/assets/~0123456789abcdef/old.png'], 'a broken index falls back to the keys (the one stored file)');
 });
 
-test('a zip File is read in slices, never whole: the same entries and bytes as from memory, and the import accepts it', async () => {
+test('the zip walk keeps each entry localOffset, so imports go in archive order and not the manifest order', () => {
+  const src = fs.readFileSync(path.resolve('public/js/assetPack.js'), 'utf8');
+  // Without this the offset lookup is always its default, the sort is a no-op, the 45k entries are read in manifest
+  // order, and each 16 MiB window is thrown away on the next read — the import looks stuck (2026-10-22).
+  assert.match(src, /localOffset: entry\.localOffset/, 'loadZip carries the entry offset');
+  assert.match(src, /\.sort\(\(a, b\) => offsetOf/, 'the walk sorts by that offset');
+});
+
+test('a zip File is read through 16 MiB windows, never streamed whole: the same entries and bytes as from memory, and the import accepts it', async () => {
   const big = new Uint8Array(150_000).map((_, i) => (i * 7) & 0xff);      // > the 64 KB tail the reader looks at
   const text = bytesOf('deflated-bytes '.repeat(40));
   const comp = await deflateRaw(text);
   const zipBytes = buildZip([
     { name: 'pack/public/assets/big.bin', raw: big },
     { name: 'pack/public/assets/t.json', raw: text, comp, method: 8 },
-    { name: 'pack/public/assets/bad.png', raw: bytesOf('crc'), crc: 1 },
+    { name: 'pack/public/assets/crc.png', raw: bytesOf('crc'), crc: 1 }, // wrong CRC: the reader below checks it
     { name: 'pack/README.txt', raw: bytesOf('readme') },
   ]);
   const real = new Blob([zipBytes]);
@@ -990,18 +1050,21 @@ test('a zip File is read in slices, never whole: the same entries and bytes as f
   assert.equal(zip.ok, true);
   assert.deepEqual(zip.entries, mem.entries);
   for (const entry of zip.entries) assert.deepEqual(await zip.read(entry), await mem.read(entry), entry.name);
-  assert.ok(slices.length > 0 && slices.every(([a, b]) => b - a < zipBytes.length), 'no read spans the file');
+  assert.ok(slices.length > 0, 'the file is read through slices');
+  // One window covers this archive, so the header, the central directory and every entry share one read.
+  assert.ok(slices.every(([a, b]) => b - a <= 16 * 1024 * 1024), 'no read exceeds one window');
+  assert.equal(slices.length, 1, 'a small archive is fetched once, not once per entry');
   assert.deepEqual((await openZip({ ...file, size: 10 })).code, 'bad-zip');
 
-  const view = rewriteManifest({ big: '/assets/big.bin', t: '/assets/t.json', bad: '/assets/bad.png' }, 'assets.json', indexFor({
-    'assets/big.bin': hash16(big), 'assets/t.json': hash16(text), 'assets/bad.png': hash16(bytesOf('crc')),
+  const view = rewriteManifest({ big: '/assets/big.bin', t: '/assets/t.json', crc: '/assets/crc.png' }, 'assets.json', indexFor({
+    'assets/big.bin': hash16(big), 'assets/t.json': hash16(text), 'assets/crc.png': hash16(bytesOf('crc')),
   }));
   const mc = memoryCache();
   const imp = createAssetImport({ fetch: manifestFetch(view.doc).fetch, caches: mc.caches });
   await imp.start({ type: 'zip', data: file });
-  assert.deepEqual({ accepted: imp.get().accepted, failed: imp.get().failed, skipped: imp.get().skipped }, { accepted: 2, failed: 1, skipped: 1 },
-    'big.bin and t.json stored, bad.png unreadable (its CRC), the README skipped');
-  assert.equal(mc.assets().length, 2);
+  assert.deepEqual({ accepted: imp.get().accepted, failed: imp.get().failed, skipped: imp.get().skipped }, { accepted: 3, failed: 0, skipped: 1 },
+    'all three stored: the import trusts SHA-256 against the manifest, not the zip CRC; the README is skipped');
+  assert.equal(mc.assets().length, 3);
 });
 
 test('设置 → 素材存储 reads and asks through StorageManager, and answers null where the browser cannot say', async () => {

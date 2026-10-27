@@ -4,8 +4,9 @@
 // Opening the dialog reads nothing from the server: no art, not the manifests (assetPack.js reads the three served
 // manifests only once an import starts) and not the download queue. The dialog: a folder (showDirectoryPicker, else an
 // <input webkitdirectory>) or a zip (a picker, or dropped), cancel, the counts, 清除已导入的素材 after a confirm, the
-// persist note, and why import is unavailable on plain http or in a browser without the APIs. Closing it cancels a
-// running import; what was stored stays, and the download queue skips it (assetDownload.js).
+// persist note, and why import is unavailable on plain http or in a browser without the APIs. The dialog's own close
+// (and 取消导入) stops a running import; closing the whole settings panel does not — the import keeps going and what
+// was stored stays either way (assetDownload.js skips it).
 import { useEffect, useRef, useState } from '../../vendor/hooks.module.js';
 import { html, Button, Modal, ProgressBar, confirmDialog } from './components.js';
 import { assetImport } from '../assetPack.js';
@@ -64,8 +65,8 @@ async function walkHandle(dir, prefix, out) {
   }
 }
 
-/** 导入素材包: the button, its hint line and the import dialog. */
-export function AssetImportButton() {
+/** 导入素材包: the button, its hint line and the import dialog. `imported`: a full import already finished here. */
+export function AssetImportButton({ imported: importedAll = false, onClear }) {
   const [open, setOpen] = useState(false);
   const [imported, setImported] = useState(() => assetImport.get());
   const [storeInfo, setStoreInfo] = useState(null);
@@ -75,10 +76,9 @@ export function AssetImportButton() {
   useEffect(() => {
     const off = assetImport.subscribe(setImported);
     setImported(assetImport.get());
-    return () => {
-      off();
-      assetImport.cancel();
-    };
+    // Closing the settings panel unmounts this button; the import is a module-level singleton and keeps running.
+    // Only 关闭 / 取消导入 in the dialog (close, below) and the cancel button stop it. Reopening reads get().
+    return off;
   }, []);
   // Cache Storage and the storage estimate only: nothing goes to the server. Read as the dialog opens and when an import
   // ends, never per stored file: listing a cache of 30,000 entries ten times a second made a whole-pack import quadratic.
@@ -185,12 +185,19 @@ export function AssetImportButton() {
     await clearImportedAssets();
     setStoreInfo({ count: 0, usage: storeInfo?.usage ?? null });
     setPersistNote(null);
+    onClear?.();
   };
 
   return html`<div class="title-assets__item">
-    <${Button} variant="secondary" block=${true} size="sm" data-testid="asset-import" aria-describedby="title-asset-import-hint"
-      onClick=${() => setOpen(true)}>${t('导入素材包')}<//>
-    <small id="title-asset-import-hint">${support.ok ? t('读取自己的素材包，美术不占服务器流量。') : t('导入需要 HTTPS 或 localhost。')}</small>
+    <div class="title-assets__done" title=${importedAll ? t('已成功导入，无需再次导入') : undefined}>
+      <${Button} variant="secondary" block=${true} size="sm" data-testid="asset-import" aria-describedby="title-asset-import-hint"
+        disabled=${importedAll} onClick=${() => setOpen(true)}>${t('导入素材包')}<//>
+    </div>
+    <small id="title-asset-import-hint">${importedAll
+      ? t('已成功导入，无需再次导入。')
+      : support.ok ? t('读取自己的素材包，美术不占服务器流量。') : t('导入需要 HTTPS 或 localhost。')}</small>
+    ${importedAll ? html`<${Button} variant="ghost" size="sm" data-testid="asset-import-reset"
+      onClick=${() => void clearImported()}>${t('清除已导入的素材，重新导入')}<//>` : null}
     <${Modal} open=${open} onClose=${close} title=${t('导入素材包')} class="asset-import-dialog" actions=${html`
       <${Button} onClick=${close}>${t('关闭')}<//>`}>
       <p class="t-lo">${t('从素材包 zip、完整包 zip 或自己的 public/assets 文件夹导入。只收下和服务器清单哈希一致的文件，不上传任何内容。')}</p>

@@ -392,7 +392,11 @@ export function battleProgress(battle) {
     leaks,
     bossDmg: pool && Number.isFinite(pool.cum) ? pool.cum : 0,
     done: !!(battle && battle.finished),
+    // cumulative actual damage of every player in this field — the leaderboard's live current-round output (display
+    // only: the match never reads it for an outcome). Rounded integers keep the 1 Hz frame small.
+    rows: {},
   };
+  for (const pid of Object.keys(pp)) out.rows[pid] = Math.max(0, Math.round(Number(pp[pid] && pp[pid].damageDealt) || 0));
   if (battle && battle.kind === 'unite') {
     const left = uniteLeft(battle);
     if (left) out.left = left;

@@ -65,6 +65,7 @@ import { sendError, sendJson } from './common.js';
 import { MIME, CompressCache, IMMUTABLE_CACHE, isNotModified, serveFile, serveBuffer } from './files.js';
 import { ASSET_INDEX_ROOTS, hashedFileOpts } from './assetIndex.js';
 import { serveMedia } from './media.js';
+import { serveAssetPack } from './assetPack.js';
 import { createPluginRegistry, sameIdentity, statIdentity } from '../plugins/registry.js';
 import { computeVanillaContent } from '../plugins/identity.js';
 import { createVisualSets } from '../plugins/visualSet.js';
@@ -206,6 +207,9 @@ export function createStaticHandler({ publicDir, dataDir, sharedDir, simDir = pa
     const urlHash = hashed.hash;
     decoded = hashed.path;
     if (decoded === '/code-source.json') { sendJson(req, res, 200, codeSource); return; }
+    // The public asset-pack zip, redirected to its signed CDN URL (assetPack.js). The body never
+    // passes through this server; a host without data/asset-pack.json answers 503.
+    if (decoded === '/asset-pack.zip') { await serveAssetPack(req, res, dataDir, { log }); return; }
     if (client === 'build' && !buildMissing && (decoded === '/' || decoded === '/index.html')) {
       let stat = null;
       try { stat = await fsp.stat(buildPage); } catch { /* not built */ }

@@ -408,6 +408,14 @@ removed. It also clears tasks when leaving the match or losing its connection.
   a queued task or terminates the Worker running it. Other task IDs are ignored; accepted answers are not cancelled.
 - S→C `b.end { battleId, fieldId, reason }` — `'cleared'` (pool 0) / `'forced'` (team LP 0): the client calls `battle.forceEnd` and reports; `'takeover'`: stop reporting, keep displaying. Both also reach a battle the client is still preparing (the sim loading, the silent catch-up): Client runner below.
 - `m.public.fields[]` gains `progress: { killed, resolved, total, done }`; `m.public.combatMode`; `m.public.paused: boolean` (always present; solo pause below).
+- `b.progress` gains optional `rows: { [playerId]: cumulative actual damage in this field }` (an authoritative client's
+  own battle, a 联防 field's helpers, a boss field's pair). It feeds the leaderboard's live current-round output only;
+  the match never reads it for an outcome. `m.damage` gains `ranks: { round, phase, live, players: [{ playerId,
+  roundDamage, damage, bounty, bountyOwn, bountyUnite, uniteKills }] }`: `roundDamage` is the current scope's sum over
+  every field the player fought on (`server/match/rankBoard.js`), `damage` the cumulative match output, and the last
+  three are settlement counters (bounty coins by source, kills inside 联防). Client-authoritative combat still sends
+  `m.damage.owners: []` / `available: false`; only `ranks` is filled there. `m.public` carries the same `ranks` object
+  (rebuilt with each public view), so a reconnect or a skipped `m.damage` still has the leaderboard.
 - `b.snap` / `b.ev` are **not sent for combat** in client mode. `g.watch` rules: see Spectating.
 
 **顶栏胶囊 (the top bar's 击倒 / 漏掉 counter; PR #157, official reading).** The capsule shows `resolved / total`:

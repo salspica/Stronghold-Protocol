@@ -137,11 +137,15 @@ export function aiLastOption(room, myId) {
   return { on: room.aiPicksLast === true, editable: room.hostId != null && room.hostId === myId };
 }
 
-/** Invite link for a room code (current page URL with ?room=CODE). */
+// 自建服门禁：邀请链接必须带上"访客密钥"（只能带访客密钥——房主密钥会让对方也能建房）。
+const GUEST_INVITE_KEY = 'ca52a613c9444f0fa08d2425b038057e';
+
+/** Invite link for a room code (current page URL with ?room=CODE, plus the guest invite key). */
 export function inviteLink(code) {
   const loc = globalThis.location;
   const base = loc ? `${loc.origin}${loc.pathname}` : '';
-  return `${base}?room=${encodeURIComponent(code)}`;
+  const q = `?room=${encodeURIComponent(code)}`;
+  return GUEST_INVITE_KEY ? `${base}${q}&invite=${GUEST_INVITE_KEY}` : `${base}${q}`;
 }
 
 /**

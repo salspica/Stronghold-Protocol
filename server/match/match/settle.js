@@ -60,16 +60,25 @@ export class MatchSettle {
       if (r.perfect !== false && counted === 0) ps.stats.perfectRounds++;
       // bounty coins (own battle + unite kills) are credited to the next prep
       let coins = Math.max(0, Math.trunc(Number(r.coins) || 0));
+      let ownCoins = coins;
+      let uniteCoins = 0;
       const up = combinedUnite && combinedUnite.perPlayer && combinedUnite.perPlayer[ps.playerId];
       if (up) {
-        coins += Math.max(0, Math.trunc(Number(up.coins) || 0));
+        uniteCoins = Math.max(0, Math.trunc(Number(up.coins) || 0));
+        coins += uniteCoins;
         ps.stats.dmgDealt += Number(up.damageDealt) || 0;
         ps.stats.kills += Number(up.killed) || 0;
+        ps.stats.uniteKills += Number(up.killed) || 0;
         if (relay) ps.stats.healing += Number(up.healingDone) || 0;
       }
       ps.creditedKills += creditedKillsOf(r) + creditedKillsOf(up);
       // perfect-payout bounties (战术特训): own phase perfect
-      for (const b of ps.bounties) if (b.card.payout === 'perfect' && counted === 0 && r.perfect !== false) coins += b.card.coin;
+      for (const b of ps.bounties) if (b.card.payout === 'perfect' && counted === 0 && r.perfect !== false) { coins += b.card.coin; ownCoins += b.card.coin; }
+      ps.stats.bountyOwn += ownCoins;
+      ps.stats.bountyUnite += uniteCoins;
+      if (coins > 0 || ps.bounties.length) {
+        this.log?.info?.(`[leaderboard] ${this.roomCode} R${this.round} ${ps.playerId}: bounty r=${Math.trunc(Number(r.coins) || 0)} unite=${uniteCoins} own=${ownCoins} cards=${ps.bounties.length}`);
+      }
       if (coins > 0) { ps.pendingFunds += coins; ps.stats.fundsGained += coins; }
       for (const b of ps.bounties) b.roundsLeft--;
       ps.bounties = ps.bounties.filter((b) => b.roundsLeft > 0);
@@ -80,6 +89,9 @@ export class MatchSettle {
       this.dispatch(ps, 'onBattleResult', { result: r, lpLoss: loss, perfect: counted === 0 && r.perfect !== false, unite: combinedUnite || null });
       ps.recompute();
     }
+    // the settlement just moved the cumulative totals / bounty / Unite kill counters: refresh the freeze with them
+    this._damageDirty = true;
+    this._flushDamage(true);
     this._revival = { round: this.round, eligible, windowOpen: false, deadline: 0 };
     const canRescue = this.revivalEnabled && this.teamLp == null && this.order.some((ps) => this.revivalDonorEligible(ps));
     for (const ps of alive) {

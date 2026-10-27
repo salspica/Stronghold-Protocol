@@ -652,6 +652,10 @@ export const C2S = {
   // solo pause (official PauseUp / ResumeUp, DESIGN §14): freezes the running battle (field clock, deadlines, the
   // browser's local runner) — solo matches only (co-op ⇒ WRONG_PHASE), only while a battle runs; m.public.paused
   'g.pause': { on: isBool },
+  // 战斗二倍速: this player's toggle for the next round's battle speed (match/speedVote.js). It is a live preference, not
+  // a timed vote: at the next battle phase's start half of the connected alive humans (rounded up) having it on doubles
+  // that battle's pace for everyone; otherwise the normal pace stays.
+  'g.speedVote': { on: isBool },
   // server-run combat, local display replicas (DESIGN §14): `local` — this browser runs its own normal / 联防 fields from
   // the b.start spec instead of being streamed them (sent once it has the sim loaded, and after a reconnect);
   // `battleId` + `stream: true` — its replica of that battle diverged from a b.sync digest (`tick`) or cannot keep up:
@@ -674,7 +678,9 @@ export const C2S = {
   // field's own scheduled enemies that were knocked out **or leaked** (official: 漏一个 1/3, 打死一个 2/3,
   // 打死会分裂的 3/3 — Battle.leakedInTotal; runtime splits / summons stay out of both parts of the capsule). A boss / hidden field adds
   // `leaksBy` = { [playerId]: the cumulative LP the enemies that reached that player's goal cost } — `leaks` minus its
-  // sum is the leader's own "扣除目标生命" effects; the server holds the b.result's leaked lists to it (Match._bossLeaksAgree)
+  // sum is the leader's own "扣除目标生命" effects; the server holds the b.result's leaked lists to it (Match._bossLeaksAgree).
+  // `rows` = { [playerId]: cumulative actual damage of that player in this field } — the in-match leaderboard's live
+  // current-round output only; the match never reads it for an outcome.
   'b.progress': {
     battleId: isId, gt: (v) => isNum(v, 0, 1e5), killed: (v) => isInt(v, 0, 1e5), total: (v) => isInt(v, 0, 1e5),
     resolved: (v) => isInt(v, 0, 1e5),
@@ -682,7 +688,8 @@ export const C2S = {
     by: (v) => isMap(v, RESULT_LIMITS.players, isId, (x) => isNum(x, 0, BIG)), done: isBool,
     left: (v) => isMap(v, MAX_PLAYER_CAPACITY, isId, (x) => isInt(x, 0, 1e5)),
     leaksBy: (v) => isMap(v, RESULT_LIMITS.players, isId, (x) => isNum(x, 0, 1e6)),
-    $optional: ['resolved', 'leaks', 'bossDmg', 'by', 'done', 'left', 'leaksBy'],
+    rows: (v) => isMap(v, MAX_PLAYER_CAPACITY, isId, (x) => isNum(x, 0, BIG)),
+    $optional: ['resolved', 'leaks', 'bossDmg', 'by', 'done', 'left', 'leaksBy', 'rows'],
   },
   // `cs` (DESIGN §32, optional): the content hash the reporting browser ran the battle on — its spec's `cs`. In a room
   // with gameplay plugins (P1c, DESIGN §32.6) the match refuses a result without it or with another one (and runs the
@@ -740,10 +747,14 @@ export const S2C = [
   'b.sync', 'b.ext',
   // Complete public round ledger (server combat): m.damage { matchId, round, phase: normal|unite|boss|hidden,
   // status: live|frozen, owners: [{ playerId, name?, seat?, total, healing, seconds, otherDamage, otherHealing,
-  // operators: [{ key, uid, defId, damage, healing }] }] }. PREP retains frozen previous-round rows; battle start resets.
+  // operators: [{ key, uid, defId, damage, healing }] }], ranks: { round, phase, live,
+  // players: [{ playerId, roundDamage, damage, bounty, bountyOwn, bountyUnite, uniteKills }] } }. PREP retains frozen
+  // previous-round rows; battle start resets. `ranks` is the leaderboard slice: current-scope (roundDamage) and
+  // cumulative output (damage), bounty coins by source and kills inside 联防 fields, per seat.
   // Operator keys identify pieces, not definitions. Damage is actual opposing HP lost, healing the effective HP restored,
   // summons credited to root ops; seconds is the owner's battle time this round (DPS / HPS).
-  // Client-authoritative combat sends available:false with owners:[] instead of trusting submitted operator stats.
+  // Client-authoritative combat sends available:false with owners:[] instead of trusting submitted operator stats;
+  // `ranks` is still filled from the field authority's b.progress `rows` (display only).
   'm.damage',
   // server-run combat streaming (legacy / SP_COMBAT=server only); full b.snap carries unitStats: [unitStatsEntry],
   // [] when no units are listed. Detail DTOs are display only; nine-field tuples and b.ev are unchanged.

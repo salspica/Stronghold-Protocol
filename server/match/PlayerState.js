@@ -255,6 +255,8 @@ export class PlayerState {
     this.stats = {
       dmgDealt: 0, kills: 0, leaks: 0, gold: 0, refreshes: 0, merges: 0, itemMerges: 0, itemsEquipped: 0,
       bossDamage: 0, lpLost: 0, buys: 0, sells: 0, perfectRounds: 0, fundsGained: 0, healing: 0,
+      // leaderboard-only counters: bounty coins by source and kills inside 联防 fields (not part of m.result's stat block)
+      bountyOwn: 0, bountyUnite: 0, uniteKills: 0,
     };
     this.eliminatedRound = null;
     this.creditedKills = 0;

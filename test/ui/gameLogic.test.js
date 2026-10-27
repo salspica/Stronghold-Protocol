@@ -691,9 +691,9 @@ describe('enemies, HUD, stats', () => {
 
 describe('keyboard & settings', () => {
   test('shortcutFor', () => {
-    assert.equal(shortcutFor({ key: 'r', code: 'KeyR' }), 'refresh');
+    assert.equal(shortcutFor({ key: 'r', code: 'KeyR' }), 'levelUp');
     assert.equal(shortcutFor({ key: 'F', code: 'KeyF' }), 'freeze');
-    assert.equal(shortcutFor({ key: 'd' }), 'levelUp');
+    assert.equal(shortcutFor({ key: 'd' }), 'refresh');
     assert.equal(shortcutFor({ key: 'q', code: 'KeyQ' }), 'retreat');
     assert.equal(shortcutFor({ key: 'Q' }), 'retreat');
     assert.equal(shortcutFor({ code: 'KeyX' }), 'sell');
