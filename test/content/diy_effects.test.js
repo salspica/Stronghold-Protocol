@@ -1,51 +1,71 @@
-// test/content/diy_effects.test.js — every skill of the two 自选 operators added on 2026-10-27 has a client-visible effect.
-// Their official battle prefabs are NOT in the local fx index (public/assets/local/fx/index.json: no char_4217_makoto /
-// char_4182_oblvns), so render/vfx has nothing to draw and the kits' own `battle.fx` events are the only effects — a
-// skill that emits none looks broken (user report 2026-10-27). Run: node --test test/content/diy_effects.test.js
-
+// test/content/diy_effects.test.js — the two 自选 operators added on 2026-10-27 draw their effects from the OFFICIAL
+// battle effects, not from kit placeholders.
+//
+// Their prefabs are not part of the repository (game art is never committed): a machine either has the local fx
+// extraction under public/assets/local/fx/ + data/local-fx.json (the maintainer's, or the two-operator fx pack) or it
+// does not. When it does, this test checks that both units and all six skills are in the index and that the prefabs
+// they reference are listed and present on disk. Without the extraction the index tests skip: CI has no game art.
+// Run: node --test test/content/diy_effects.test.js
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeBattle, enemyRec, checkInvariants } from '../helpers/battleHarness.js';
+import { readFileSync, existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const ENEMIES = { enemy_dummy: enemyRec({ key: 'enemy_dummy', hp: 1e9, speed: 0, mass: 0 }) };
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const INDEX = path.join(ROOT, 'public/assets/local/fx/index.json');
+const LIST = path.join(ROOT, 'data/local-fx.json');
+const HAS_FX = existsSync(INDEX) && existsSync(LIST);
 const OPS = [
-  { char: 'char_4217_makoto', name: '结城理', cast: 'personaCast' },
-  { char: 'char_4182_oblvns', name: '丰川祥子', cast: 'note' },
+  { char: 'char_4217_makoto', name: '结城理', skills: ['skchr_makoto_1', 'skchr_makoto_2', 'skchr_makoto_3'] },
+  { char: 'char_4182_oblvns', name: '丰川祥子', skills: ['skchr_oblvns_1', 'skchr_oblvns_2', 'skchr_oblvns_3'] },
 ];
+const skip = HAS_FX ? false : 'no local fx extraction (public/assets/local/fx/index.json + data/local-fx.json)';
+/** Every string in a JSON value (an index entry nests effects under modes / abilities / talents / roles / uses). */
+const strings = (v, out = []) => {
+  if (typeof v === 'string') out.push(v);
+  else if (Array.isArray(v)) v.forEach((x) => strings(x, out));
+  else if (v && typeof v === 'object') Object.values(v).forEach((x) => strings(x, out));
+  return out;
+};
 
-/** Cast the picked skill on a DIY 6★ piece facing one dummy and return the cast's fx tuples. */
-function cast(charId, skillIndex) {
-  const h = makeBattle({
-    defs: { enemies: ENEMIES }, timeLimit: 600, autoFinish: false, seed: 5,
-    flags: { dpPerSec: 0, dpMax: 999 }, hooks: ['skillStart', 'skillEnd'],
-    units: [{ uid: 1, diy: { slot: 6, charId, skillIndex, uniEquipId: null }, elite: false, row: 10, col: 5 }],
-  });
-  h.step();
-  const u = h.unit(1);
-  h.spawn('enemy_dummy', { pos: [10, 7] });
-  u.skill.gainSp(999);
-  assert.ok(h.runUntil(() => u.skill.activations >= 1, 3), `${charId} skill ${skillIndex + 1}: cast`);
-  h.run(2.5);
-  checkInvariants(h.b);
-  assert.equal(h.b.errors.length, 0, JSON.stringify(h.b.errors[0]));
-  return h.eventsOf('fx');
-}
-
-for (const op of OPS) {
-  for (let skill = 0; skill < 3; skill++) {
-    test(`${op.name} skill ${skill + 1}: the client gets an effect`, () => {
-      const fx = cast(op.char, skill);
-      assert.ok(fx.length > 0, 'some fx');
-      for (const e of fx) {
-        assert.ok(Number.isFinite(e[2]) && Number.isFinite(e[3]), `fx ${e[1]} has a position`);
-        assert.ok(e[4] && e[4].id != null, `fx ${e[1]} names its owner`);
-      }
-      assert.ok(fx.some((e) => e[1] === op.cast), `the cast's own ${op.cast} fx`);
-    });
+test('the two operators and their six skills are in the official fx index', { skip }, () => {
+  const idx = JSON.parse(readFileSync(INDEX, 'utf8'));
+  assert.equal(idx.version, 3, 'index version');
+  assert.ok(Object.keys(idx.units).length > 500 && Object.keys(idx.skills).length > 500, 'the extraction is the used set');
+  for (const op of OPS) {
+    const u = idx.units[op.char];
+    assert.ok(u, `${op.name} is in the fx index`);
+    assert.ok(Object.keys(u.modes || {}).length > 0, `${op.name}: attack modes`);
+    assert.ok(u.talentKeys && Object.keys(u.talentKeys).length > 0, `${op.name}: talent effect keys`);
+    for (const s of op.skills) assert.ok(idx.skills[s], `${s} is in the fx index`);
   }
-}
+});
 
-test('结城理: every attack of a running skill sparks on its target too (not only the cast)', () => {
-  const fx = cast('char_4217_makoto', 0);
-  assert.ok(fx.some((e) => e[1] === 'personaHit' && e[4]?.target != null), 'a hit spark');
+test('the prefabs the two operators reference are extracted and on disk', { skip }, () => {
+  const idx = JSON.parse(readFileSync(INDEX, 'utf8'));
+  const list = JSON.parse(readFileSync(LIST, 'utf8'));
+  const prefabs = list.groups?.['fx/prefabs'] ?? {};
+  let checked = 0;
+  for (const op of OPS) {
+    const keys = new Set(strings([idx.units[op.char], ...op.skills.map((s) => idx.skills[s])]).filter((k) => idx.prefabs[k]));
+    assert.ok(keys.size >= 5, `${op.name}: references extracted prefabs (${keys.size})`);
+    for (const k of keys) {
+      const e = prefabs[k];
+      assert.ok(e, `${op.name}: ${k} is listed in data/local-fx.json`);
+      assert.ok(existsSync(path.join(ROOT, 'public', String(e.path).replace(/^\//, ''))), `${op.name}: ${k} file exists`);
+      checked++;
+    }
+  }
+  assert.ok(checked >= 20, `checked ${checked} prefabs across the two operators`);
+});
+
+test('the kits no longer carry the procedural placeholder effects', () => {
+  const kit = readFileSync(path.join(ROOT, 'server/sim/content/kits/ops/op-makoto.js'), 'utf8');
+  const oblvns = readFileSync(path.join(ROOT, 'server/sim/content/kits/ops/op-oblvns.js'), 'utf8');
+  for (const k of ['personaCast', 'personaHit', 'personaFear']) assert.ok(!kit.includes(k), `${k} is gone from the kit`);
+  for (const k of ["battle.fx('note'", 'noteFx']) assert.ok(!oblvns.includes(k), `${k} is gone from the kit`);
+  // her ranged attacks still name the procedural fallback projectile (a machine without the fx pack draws it)
+  const notes = readFileSync(path.join(ROOT, 'server/sim/content/notes.js'), 'utf8');
+  assert.match(notes, /\['atk', unit\.id, target\.id, 'note'\]/);
 });

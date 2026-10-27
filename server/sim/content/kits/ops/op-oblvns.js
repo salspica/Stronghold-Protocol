@@ -42,7 +42,6 @@ export default {
     const b1 = bbOf(chess, S1), b2 = bbOf(chess, S2), b3 = bbOf(chess, S3);
     const r3 = skillRec(chess, S3);
     const selected = def?.skill?.skillId ?? chess?.skill?.skillId ?? null;
-    const noteFx = (battle, unit, skill, extra = {}) => battle.fx('note', { x: unit.x, y: unit.y, id: unit.id, skill, ...extra });
     return {
       skills: {
         // 新月的苏醒: the eight notes are the skill (they outlive her range — content/notes.js)
@@ -52,7 +51,6 @@ export default {
           onStart({ battle, unit }) {
             const scales = NOTE_KEYS.map((k, i) => num(b1[k], NOTE_FALLBACK[i]));
             playNotes(battle, unit, scales, { gap: NOTE_GAP, skill: 'oblvns:s1' });
-            noteFx(battle, unit, 'oblvns:1', { n: scales.length });
           },
         },
         // 满月的舞会: 钢琴 (equipped, +ATK) → 风琴 (+attack speed) on the cast
@@ -61,7 +59,6 @@ export default {
           mods: { aspd: num(b2['attack@attack_speed'], 0) },
           onStart({ battle, unit }) {
             battle.removeBuff(unit, PIANO_KEY);
-            noteFx(battle, unit, 'oblvns:2', { timbre: 'organ' });
           },
         },
         // 残月的余响: the notes are the attack — 2 物理 on the highest DEF, 2 法术 on the highest RES, each attack interval
@@ -70,9 +67,6 @@ export default {
           mods: {},
           ...(r3?.rangeGrid ? { targeting: { rangeGrid: r3.rangeGrid } } : {}),
           attack: { noAttack: true },
-          onStart({ battle, unit }) {
-            noteFx(battle, unit, 'oblvns:3', { timbre: 'both' });
-          },
           onTick({ battle, unit }) {
             if (unit.atkCd > 0 || !unit.canAct || unit.s.flags.disarm) return;
             const foes = noteTargets(battle, unit);
@@ -86,7 +80,6 @@ export default {
               if (piano) fireNote(battle, unit, piano, { atkScale: scale, dmgType: 'phys', skill: 'oblvns:s3' });
               if (organ) fireNote(battle, unit, organ, { atkScale: scale, dmgType: 'arts', skill: 'oblvns:s3' });
             }
-            noteFx(battle, unit, 'oblvns:3', { n: 4 });
             if (battle.hasHook('attack')) battle.emit('attack', { attacker: unit, targets: foes.slice(0, 1), isSkill: true });
           },
         },

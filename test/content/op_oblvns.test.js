@@ -36,7 +36,6 @@ function field({ skill = 0, row = 10, col = 5 } = {}) {
   return { h, u: h.unit(1) };
 }
 const noteHits = (h, u) => h.hooksOf('damaged').filter((c) => c.source === u && (c.dmg?.tags || []).includes('note'));
-const fxOf = (h, kind) => h.eventsOf('fx').filter((e) => e[1] === kind);
 function done(h) {
   checkInvariants(h.b);
   assert.equal(h.b.errors.length, 0, JSON.stringify(h.b.errors[0]));
@@ -58,8 +57,6 @@ test('S1 新月的苏醒: eight notes, one per charge, damage falling 65 % → 4
   for (const c of hits) assert.deepEqual([c.type, !!c.dmg.isSkill], ['arts', true]);
   assert.ok(hits[0].amount > hits[7].amount, 'the sequence falls');
   assert.equal(h.eventsOf('atk').filter((ev) => ev[3] === 'note' && ev[1] === u.id).length >= 8, true, 'the client sees the notes');
-  assert.ok(fxOf(h, 'note').length >= 1, 'the cast fx');
-  assert.ok(fxOf(h, 'noteHit').length >= 8, 'a landing fx per note');
   done(h);
 });
 
@@ -84,7 +81,6 @@ test('S2 满月的舞会: 钢琴 is the equipped timbre (+60 % ATK from deployme
   assert.ok(h.runUntil(() => u.skill.active, 3), 'organ on');
   assert.equal(u.findBuff('oblvns:piano'), null, 'piano off');
   approx(u.s.aspd, baseAspd + 80, 'organ: +80 attack speed');
-  assert.ok(fxOf(h, 'note').some((e) => e[4]?.timbre === 'organ'));
   done(h);
 });
 

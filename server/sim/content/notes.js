@@ -3,10 +3,12 @@
 // profile (kits/ops/op-oblvns.js).
 //
 // A note is an ordinary homing projectile (sim/projectiles.js re-aims it at its victim every tick) with a 'note' visual the
-// client draws (render/style.js PROJ.note) and a lifetime of NOTE_LIFE seconds [ASSUMED: the talent says "一段时间" and
-// gives no number; the projectile's own maxAge is the same clock]. It deals its own atk × scale of 物理 / 法术 damage on
-// arrival; a victim that dies (or goes 隐匿) mid-flight is not struck — the note lands where it was anyway, so a volley
-// never leaves projectiles hanging (hitDead). Nothing here is per-battle state: every note's data lives in the projectile.
+// client draws (render/style.js PROJ.note — the procedural fallback; with the operator fx pack installed the client's
+// official layer draws her own shot instead, wiring.attack) and a lifetime of NOTE_LIFE seconds [ASSUMED: the talent says
+// "一段时间" and gives no number; the projectile's own maxAge is the same clock]. It deals its own atk × scale of 物理 / 法术
+// damage on arrival; a victim that dies (or goes 隐匿) mid-flight is not struck — the note lands where it was anyway, so a
+// volley never leaves projectiles hanging (hitDead). Nothing here is per-battle state: every note's data lives in the
+// projectile.
 
 /** Tiles/s of a note [ASSUMED: between the bolt (11) and the arrow (14); S2's 钢琴 "飞行速度加快" / 风琴 "飞行速度减缓"
  *  are not modelled]. */
@@ -23,8 +25,9 @@ export function noteTargets(battle, unit) {
 /**
  * One note from `unit` at `target`. `opts`:
  *   atkScale  × the unit's ATK (1)     dmgType  'arts' | 'phys' ('arts')
- *   skill     the fx / damage tag name ('oblvns')   speed  tiles/s (NOTE_SPEED)
- * The client draws the flight from the 'atk' event (tuple ['atk', src, tgt, 'note'], ai.js).
+ *   skill     the damage tag name ('oblvns')   speed  tiles/s (NOTE_SPEED)
+ * The client draws the flight from the 'atk' event (tuple ['atk', src, tgt, 'note'], ai.js) — the procedural fallback;
+ * with the operator fx pack deployed the official layer draws her own shot and skips it (wiring.attack).
  * @returns {object|null} the projectile (null when there is no living target)
  */
 export function fireNote(battle, unit, target, opts = {}) {
@@ -37,8 +40,7 @@ export function fireNote(battle, unit, target, opts = {}) {
   return battle.addProjectile({
     from: unit, target, speed: opts.speed > 0 ? opts.speed : NOTE_SPEED, visual: 'note', source: unit,
     hitDead: true, maxAge: opts.maxAge > 0 ? opts.maxAge : NOTE_LIFE,
-    onHit: ({ target: t, x, y }) => {
-      battle.fx('noteHit', { x, y, id: unit.id, skill });
+    onHit: ({ target: t }) => {
       if (!t || !t.alive) return;
       battle.dealDamage(unit, t, { amount: unit.s.atk * scale, type: dmgType, isSkill: true, tags: ['note', 'skill', skill] });
     },
