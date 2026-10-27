@@ -36,7 +36,7 @@ const attacks = (h, u) => h.hooksOf('damaged').filter((c) => c.source === u && c
 function done(h) { checkInvariants(h.b); assert.equal(h.b.errors.length, 0, JSON.stringify(h.b.errors[0])); }
 
 test('casting a skill switches to that persona; a lethal hit on the body uses the equipped skill\'s persona', () => {
-  for (const [skill, form] of [[0, 'dollS1'], [1, 'dollS2'], [2, 'dollS3']]) {
+  for (const [skill, form] of [[0, 'Stand_S1'], [1, 'Stand_S2'], [2, 'Stand_S3_1']]) {
     const { h, u } = field(skill);
     cast(h, u);
     assert.deepEqual([u.form, u.trait.doll], [form, true], `skill ${skill + 1}`);
@@ -44,7 +44,7 @@ test('casting a skill switches to that persona; a lethal hit on the body uses th
   }
   const { h, u } = field(1);
   h.b.dealDamage(null, u, { amount: 1e9, type: 'true' });
-  assert.deepEqual([u.alive, u.form], [true, 'dollS2']);
+  assert.deepEqual([u.alive, u.form], [true, 'Stand_S2']);
   done(h);
 });
 
@@ -81,11 +81,11 @@ test('S2 塔纳托斯: fear (35 %) with attack@atk_scale arts damage, and the 0.
 test('S3 P1 → P2: a second cast inside the standin gives block 2, 35 % dodge, no attacks and the heal aura', () => {
   const { h, u } = field(2);
   cast(h, u);
-  assert.equal(u.form, 'dollS3');
+  assert.equal(u.form, 'Stand_S3_1');
   assert.ok(u.findBuff('makoto:s3'), 'P1 attack speed buff');
   h.run(1.2); // the switch buff (阻回) has ended: the second cast can take its SP
   cast(h, u);
-  assert.equal(u.form, 'dollS3P2', 'P2');
+  assert.equal(u.form, 'Stand_S3_2', 'P2');
   assert.equal(u.findBuff('makoto:s3'), null, 'P1 buff dropped');
   assert.equal(u.s.blockCnt, 2, 'block 2');
   approx(u.s.dodgePhys, skillOf(S3).bb['attack@prob']);
@@ -110,7 +110,7 @@ test('a lethal hit on P1 turns it into P2 instead of knocking him out; the stand
   const left = sub.timeLeft;
   h.b.dealDamage(null, u, { amount: 1e9, type: 'true' });
   assert.ok(u.alive, 'not knocked out');
-  assert.equal(u.form, 'dollS3P2');
+  assert.equal(u.form, 'Stand_S3_2');
   assert.ok(u.findBuff('trait:substitute').timeLeft <= left + 1e-6, 'the same standin, not refreshed');
   done(h);
 });

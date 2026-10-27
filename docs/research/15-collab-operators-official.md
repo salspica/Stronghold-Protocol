@@ -513,12 +513,12 @@ The server fork has the three kits this note was written for (`server/sim/conten
   persona / timbre) on top of the base profile, and `professions.js installDollkeeper` takes the form name from
   `profile.dollForm(unit)` (default `doll`) and `profile.dollNoSp === false` (the standin keeps gaining SP, so S3 can be
   re-cast inside it). Both are display-free sim hooks; no golden of another operator moved.
-- **结城理**: the three skills are instant casts that switch the persona (`dollS1` / `dollS2` / `dollS3`); S3's second
-  cast — or a lethal hit on P1 — turns it into `dollS3P2` inside the same standin (no refresh); S1 heals a <50 % ally
+- **结城理**: the three skills are instant casts that switch the persona (`Stand_S1` / `Stand_S2` / `Stand_S3_1`); S3's second
+  cast — or a lethal hit on P1 — turns it into `Stand_S3_2` inside the same standin (no refresh); S1 heals a <50 % ally
   for `attack@heal_scale` instead of attacking; S2's attack is 0-scale and carries the fear + `attack@atk_scale` arts
   damage, with the 0.1 s aura executing feared enemies below `attack@kill_atk_scale`×ATK for 9,999,999 pure (a boss
   leader's 300,000 cap cancels it); T1 is the standin-only +ATK/+HP/interval buff and the switch slow; T2 hits around
-  every allied operator when the standin ends. The view's FORMS keys are `dollS1/S2/S3/S3P2`.
+  every allied operator when the standin ends. The view's FORMS keys are `Stand_S1/S2/S3/S3P2`.
 - **丰川祥子**: S1 fires its eight notes at 0.1 s intervals with the eight `atk_scale*` steps; S2 is a real timbre
   toggle (钢琴 +`attack@atk` ATK / physical, 风琴 +`attack@attack_speed` ASPD / arts with the slower `noteSlow`
   projectile); S3 stays 2 物理 on highest DEF + 2 法术 on highest RES (no P1/P2 — that is 结城理's S3); T1 counts the

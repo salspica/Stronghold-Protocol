@@ -257,7 +257,7 @@ const installDollkeeper = (battle, unit) => {
     const dur = DOLL_SWITCH + (unit.profile.dollDuration ?? 20);
     const mul = dollHpMul();
     // the form the client draws: a kit may name its own (结城理's personas `dollS1` / `dollS2` / `dollS3` / `dollS3P2`,
-    // kits/ops/op-makoto.js; render/units.js FORMS); default 'doll'
+    // the client mode names, kits/ops/op-makoto.js; render/units.js FORMS); default 'doll'
     const form = typeof unit.profile.dollForm === 'function' ? (unit.profile.dollForm(unit) || 'doll') : 'doll';
     // 阻回 for the whole form by default (傀儡师's switch/standin); a kit whose 替身 keeps gaining SP (结城理 re-casts S3
     // inside the standin, `dollNoSp: false`) opts out

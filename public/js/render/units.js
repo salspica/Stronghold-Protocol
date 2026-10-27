@@ -410,12 +410,18 @@ export const FORMS = Object.freeze({
   char_4016_kazema: Object.freeze({
     doll: Object.freeze({ change: 'Start_B', leave: 'Start', roles: dollRoles('Idle_B', 'Die_B', 'Attack_B') }),
   }),
-  // 结城理 (char_4217_makoto, 自选 6★ 傀儡师): the <替身> is a Persona per UnitMode (docs/research/15 §2.1), named by the
-  // sim's form (professions.js dollForm → content/kits/ops/op-makoto.js): `dollS1` 俄耳甫斯, `dollS2` 塔纳托斯,
-  // `dollS3` 塔纳托斯 (P1: attacks) and `dollS3P2` 俄耳甫斯 (P2: no attack; the P1→P2 change clip). `doll` stays as the
-  // generic fallback. [ASSUMED] the clips of each persona (Doll_Skill_*), and S2's 塔纳托斯 has no attack clip of its own,
-  // so its loop covers the attacks.
+  // 结城理 (char_4217_makoto, 自选 6★ 傀儡师): the <替身> is a Persona per UnitMode (docs/research/15 §2.1). The sim names
+  // the form by the client's own mode name (professions.js dollForm → content/kits/ops/op-makoto.js) so the official
+  // effects map it to the mode (`render/vfx/skillfx.js formMode`: a form named like a mode selects it) — `Stand_S1`
+  // 俄耳甫斯, `Stand_S2` 塔纳托斯, `Stand_S3_1` 塔纳托斯 (P1: attacks) and `Stand_S3_2` 俄耳甫斯 (P2: no attack; the P1→P2
+  // change clip). The old `dollS*` names stay as aliases for snapshots from before the rename; `doll` is the generic
+  // fallback. [ASSUMED] the clips of each persona (Doll_Skill_*), and S2's 塔纳托斯 has no attack clip of its own, so its
+  // loop covers the attacks.
   char_4217_makoto: Object.freeze({
+    Stand_S1: dollSet('Doll_Skill_1_Idle', 'Doll_Skill_1_Die', 'Doll_Skill_1_Attack', 'Doll_Skill_1_SwitchIn', 'Doll_Skill_1_SwitchOut', 'Doll_Skill_1_Stun'),
+    Stand_S2: dollSet('Doll_Skill_2_Loop', 'Doll_Skill_2_Die', 'Doll_Skill_2_Loop', 'Doll_Skill_2_SwitchIn', 'Doll_Skill_2_SwitchOut', 'Doll_Skill_2_Stun'),
+    Stand_S3_1: dollSet('Doll_Skill_3_P1_Idle', 'Doll_Skill_3_P2_Die', 'Doll_Skill_3_P1_Attack_A', 'Doll_Skill_3_P1_SwitchIn', 'Doll_Skill_3_P1_SwitchOut', 'Doll_Skill_3_P1_Stun'),
+    Stand_S3_2: dollSet('Doll_Skill_3_P2_Loop', 'Doll_Skill_3_P2_Die', null, 'Doll_Skill_3_P1toP2_ChangeBegin', 'Doll_Skill_3_P2_SwitchOut', 'Doll_Skill_3_P2_Stun'),
     dollS1: dollSet('Doll_Skill_1_Idle', 'Doll_Skill_1_Die', 'Doll_Skill_1_Attack', 'Doll_Skill_1_SwitchIn', 'Doll_Skill_1_SwitchOut', 'Doll_Skill_1_Stun'),
     dollS2: dollSet('Doll_Skill_2_Loop', 'Doll_Skill_2_Die', 'Doll_Skill_2_Loop', 'Doll_Skill_2_SwitchIn', 'Doll_Skill_2_SwitchOut', 'Doll_Skill_2_Stun'),
     dollS3: dollSet('Doll_Skill_3_P1_Idle', 'Doll_Skill_3_P2_Die', 'Doll_Skill_3_P1_Attack_A', 'Doll_Skill_3_P1_SwitchIn', 'Doll_Skill_3_P1_SwitchOut', 'Doll_Skill_3_P1_Stun'),

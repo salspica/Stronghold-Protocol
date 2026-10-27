@@ -55,7 +55,7 @@ const frontAnims = () => assets.chars[MAKOTO].spine.front.animations;
 describe('结城理\'s <替身> persona clip sets', () => {
   test('one form per persona; every clip exists in the Front skeleton (Doll_*, no *_B)', () => {
     const anims = frontAnims();
-    for (const [name, want] of [['dollS1', 'Doll_Skill_1_'], ['dollS2', 'Doll_Skill_2_'], ['dollS3', 'Doll_Skill_3_P1_'], ['dollS3P2', 'Doll_Skill_3_P2_']]) {
+    for (const [name, want] of [['Stand_S1', 'Doll_Skill_1_'], ['Stand_S2', 'Doll_Skill_2_'], ['Stand_S3_1', 'Doll_Skill_3_P1_'], ['Stand_S3_2', 'Doll_Skill_3_P2_']]) {
       const f = form(name);
       assert.ok(f, `${name} is a form`);
       for (const role of [f.roles.idle, f.roles.attack?.loop, f.roles.stun?.loop]) {
@@ -73,25 +73,25 @@ describe('结城理\'s <替身> persona clip sets', () => {
   });
 
   test('each persona plays its own clips, S3 P2 turns over on the P1→P2 change clip', async () => {
-    const s1 = await op({ form: 'dollS1' });
+    const s1 = await op({ form: 'Stand_S1' });
     assert.equal(clip(s1), 'Doll_Skill_1_Idle', 'a late view starts on the persona without the switch clip');
     s1.onAttack(null, 2);
     assert.equal(clip(s1), 'Doll_Skill_1_Attack');
 
-    const s2 = await op({ form: 'dollS2' });
+    const s2 = await op({ form: 'Stand_S2' });
     assert.equal(clip(s2), 'Doll_Skill_2_Loop', '塔纳托斯');
     s2.onAttack(null, 2);
     assert.equal(clip(s2), 'Doll_Skill_2_Loop', 'its loop covers the attacks (no attack clip)');
 
-    const s3 = await op({ form: 'dollS3' });
+    const s3 = await op({ form: 'Stand_S3_1' });
     assert.equal(clip(s3), 'Doll_Skill_3_P1_Idle');
     s3.onAttack(null, 2);
     assert.equal(clip(s3), 'Doll_Skill_3_P1_Attack_A');
 
-    const p2 = await op({ form: 'dollS3P2' });
+    const p2 = await op({ form: 'Stand_S3_2' });
     assert.equal(clip(p2), 'Doll_Skill_3_P2_Loop', 'P2 俄耳甫斯 does not attack');
     const change = await op();
-    change.setForm('dollS3P2', { id: 1, form: 'dollS3P2' });
+    change.setForm('Stand_S3_2', { id: 1, form: 'Stand_S3_2' });
     assert.equal(clip(change), 'Doll_Skill_3_P1toP2_ChangeBegin', 'the P1→P2 change clip');
     secs(change, 0.6);
     assert.equal(clip(change), 'Doll_Skill_3_P2_Loop');
@@ -99,7 +99,7 @@ describe('结城理\'s <替身> persona clip sets', () => {
 
   test('the form\'s switch clips: the 本体 comes back on the persona\'s SwitchOut; knocked out it holds its Die clip', async () => {
     const v = await op();
-    v.setForm('dollS1', { id: 1, form: 'dollS1', dur: 21 });
+    v.setForm('Stand_S1', { id: 1, form: 'Stand_S1', dur: 21 });
     secs(v, 2);
     v.setForm(null, { id: 1, form: null });        // the sim's 'swap' fx
     assert.equal(clip(v), 'Doll_Skill_1_SwitchOut');
@@ -107,7 +107,7 @@ describe('结城理\'s <替身> persona clip sets', () => {
     assert.equal(clip(v), 'Idle', 'the 本体 again');
 
     const dead = await op();
-    dead.setForm('dollS2', { dur: 21 });
+    dead.setForm('Stand_S2', { dur: 21 });
     secs(dead, 2);
     dead.die();
     assert.equal(clip(dead), 'Doll_Skill_2_Die');
@@ -119,8 +119,8 @@ describe('结城理\'s <替身> persona clip sets', () => {
   test('the Back skeleton lacks the persona clips: facing UP it is shown without them', async () => {
     const v = await op({ dir: 'UP' });
     assert.ok(v.entryBack, 'the Back model');
-    v.setForm('dollS1', { id: 1, form: 'dollS1', dur: 21 });
-    assert.equal(v.form, 'dollS1');
+    v.setForm('Stand_S1', { id: 1, form: 'Stand_S1', dur: 21 });
+    assert.equal(v.form, 'Stand_S1');
     assert.ok(!('Doll_Skill_1_SwitchIn' in assets.chars[MAKOTO].spine.back.animations));
     assert.equal(clip(v), 'Doll_Skill_1_Idle', 'straight to the persona');
   });
@@ -145,19 +145,19 @@ describe('the sim names the persona and the view follows (DIY pick → Battle �
     h.b.drainEvents();
     h.b.dealDamage(null, u, { amount: 1e9, type: 'true' });
     assert.ok(u.alive && u.deployed, 'still on the field');
-    assert.equal(u.form, 'dollS2', 'S2 equips 塔纳托斯');
+    assert.equal(u.form, 'Stand_S2', 'S2 equips 塔纳托斯');
     assert.equal(u.trait.doll, true);
     assert.ok(u.findBuff('trait:substitute'), 'the 20 s <替身>');
     const fx = h.eventsOf('fx').filter((e) => e[1] === 'substitute');
     assert.equal(fx.length, 1, JSON.stringify(h.eventsOf('fx')));
-    assert.deepEqual([fxForm(fx[0]), fx[0][4].id, fx[0][4].dur], ['dollS2', u.id, 21]);
-    assert.deepEqual([unitInfo(u).form, unitInfo(u).skillIndex, unitInfo(u).spine], ['dollS2', 1, MAKOTO]);
+    assert.deepEqual([fxForm(fx[0]), fx[0][4].id, fx[0][4].dur], ['Stand_S2', u.id, 21]);
+    assert.deepEqual([unitInfo(u).form, unitInfo(u).skillIndex, unitInfo(u).spine], ['Stand_S2', 1, MAKOTO]);
     h.run(21.5);
     assert.deepEqual([u.form, u.trait.doll], [null, false]);
   });
 
   test('casting S1/S2/S3 switches to that persona; T1 buffs the standin', () => {
-    for (const [skill, want] of [[0, 'dollS1'], [1, 'dollS2'], [2, 'dollS3']]) {
+    for (const [skill, want] of [[0, 'Stand_S1'], [1, 'Stand_S2'], [2, 'Stand_S3_1']]) {
       const { h, u } = field(skill);
       cast(h, u);
       assert.equal(u.form, want, `skill ${skill + 1}`);

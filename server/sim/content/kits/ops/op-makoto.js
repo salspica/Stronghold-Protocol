@@ -29,8 +29,12 @@ const S1 = 'skchr_makoto_1';
 const S2 = 'skchr_makoto_2';
 const S3 = 'skchr_makoto_3';
 const bbOf = (chess, id) => skillRec(chess, id)?.bb ?? {};
-/** The client form of each persona (render/units.js FORMS). */
-const PERSONA_FORM = { s1: 'dollS1', s2: 'dollS2', s3: 'dollS3', s3p2: 'dollS3P2' };
+/**
+ * The form of each persona — the client's own UnitMode names (index.json units[id].modes, render/units.js FORMS). The
+ * official effect wiring maps a sim form to a mode by name (render/vfx/skillfx.js formMode), so these names are what
+ * makes the persona's attack / hit / skill effects play at all; a private name ('dollS3') left the view on Default.
+ */
+const PERSONA_FORM = { s1: 'Stand_S1', s2: 'Stand_S2', s3: 'Stand_S3_1', s3p2: 'Stand_S3_2' };
 /** The persona the equipped skill summons (the client's makoto_tr / switch2stand_* read the skill index). */
 const PERSONA_OF_SKILL = { [S1]: 's1', [S2]: 's2', [S3]: 's3' };
 const at = (unit, extra) => ({ x: unit.x, y: unit.y, id: unit.id, ...extra });

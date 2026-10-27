@@ -1617,8 +1617,10 @@ def emitter_export(cls, fields):
 
 
 def is_emitter(cls, fields):
-    """Whether a behaviour is an effect emitter: an `…Emitter` class or one with UberEffectEmitter's row lists."""
-    return cls.endswith('Emitter') or any(k in fields for k in EMIT_LISTS)
+    """Whether a behaviour is an effect emitter: an `…Emitter` class, one with UberEffectEmitter's row lists, or
+    `LocalEffectRows` (a newer emitter kind whose rows stay on the attack — 结城理's Stand_S2 / Stand_S3_1 hit rows name
+    it as `emitter: 1`; without it those hit effects were dropped from the index)."""
+    return cls.endswith('Emitter') or cls == 'LocalEffectRows' or any(k in fields for k in EMIT_LISTS)
 
 
 def is_ability(cls):
