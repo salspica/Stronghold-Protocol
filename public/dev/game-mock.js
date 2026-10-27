@@ -19,6 +19,7 @@ import { settingsStore } from '/js/ui/settings.js';
 import { awayStore } from '/js/ui/matchChrome.js';
 import { GAME_FILES } from '/js/ui/gameComponents.js';
 import { PHASE, GEO } from '/shared/constants.js';
+import { diyRecordOf } from '/shared/diy.js';
 
 const params = new URLSearchParams(location.search);
 const SHOT = params.get('shot') === '1';
@@ -26,6 +27,21 @@ const VARIANTS = new Set((params.get('variant') || '').split(',').filter(Boolean
 // the match's stage (data/stages.json id): ?stage=act1autochess_m01 boards a stage whose own devices (crates / turrets)
 // stand on the prep field — the default act2autochess_m01 keeps its blowers and turrets off it (rows 6 / 8 / 13)
 const STAGE_ID = params.get('stage') || 'act2autochess_m01';
+// ?variant=diy&char=<charId>&slot=5|6&skill=0|1|2[&module=<uniEquipId>] — a 自选编队 piece of that operator on the board
+// (m.private.diy, the slot's record composed like the server's shared/diy.js diyRecordOf), so a 6★ operator outside the
+// chess pool can be fought with. Default: 结城理 (char_4217_makoto, 傀儡师).
+const DIY_CHAR = params.get('char') || 'char_4217_makoto';
+const DIY_TIER = Number(params.get('slot') || 6) === 5 ? 5 : 6;
+const DIY_SKILL = Math.max(0, Math.min(2, Number(params.get('skill') || 0)));
+const DIY_MODULE = params.get('module') || null;
+// ?lethal[=<s>] (or the `lethal` variant) — after <s> combat seconds (default 4) the 自选 unit takes a lethal hit: the
+// client draws the sim's 'substitute' fx, which switches it to its <替身> (and back after the 20 s form + 1 s switch, fx
+// 'swap'). The report this reproduces: 结城理 showed no substitute.
+const lethalDelay = () => {
+  if (!VARIANTS.has('lethal')) return null;
+  const n = Number(params.get('lethal'));
+  return n > 1 ? n : 4;
+};
 
 // ---- deterministic rng ----------------------------------------------------------------------------------
 let seed = 20260927;
@@ -72,6 +88,21 @@ function chessPiece(c, golden = false) {
 }
 function itemPiece(it) { return { uid: nextUid(), kind: 'item', id: it.id, golden: !!it.isGolden, tier: it.tier }; }
 
+/** The 自选 record of the slot record `slot` filled with `pick` (the server's shared/diy.js diyRecordOf), or null. */
+function composeDiy(slot, pick) {
+  try { return diyRecordOf(slot, pick, { chess: data.get('chess'), backups: data.get('backups') }); } catch { return null; }
+}
+/**
+ * The record a board / hand piece shows: the operator of a 自选 slot this mock filled (m.private.diy), else the chess
+ * record — the same lookup the match UI does (ui/gameLogic/diy.js diyGetter).
+ */
+function pieceRecord(p) {
+  if (!p || p.kind !== 'chess') return null;
+  const c = data.lookup('chess', p.id);
+  const pick = c?.isDiy ? S?.priv?.diy?.[p.id] : null;
+  return (pick && typeof pick.charId === 'string' ? composeDiy(c, pick) : null) || c;
+}
+
 // the mock server's bond counts: BOARD distinct members, plus 调和 (maniShip) like server/match/bondsMeta.js — a 调和
 // operator on the board adds 1 to every core bond that has a member and marks the entry `harmony: 1` (the server sends it);
 // the mode's inactive bonds (标准) are left out, as the server does
@@ -81,7 +112,7 @@ function computeBonds(priv) {
   const inactive = new Set(data.get('config')?.modes?.[S?.pub?.modeId]?.inactiveBondIds || []);
   for (const p of priv.board) {
     if (p.kind !== 'chess') continue;
-    const c = data.lookup('chess', p.id);
+    const c = pieceRecord(p);
     const base = c?.baseId || p.id;
     if (seen.has(base)) continue;
     seen.add(base);
@@ -299,6 +330,35 @@ function applyGapVariants() {
     const at = S.priv.board[1];
     if (mani && at) S.priv.board[1] = { ...chessPiece(mani), row: at.row, col: at.col };
   }
+  if (VARIANTS.has('diy')) applyDiyVariant();
+}
+
+/**
+ * `diy` variant: fills the tier-`slot` 自选 slot with `char` (m.private.diy, as the server sends it) and puts a piece of
+ * that slot on the board — in place of the second operator, on its tile — plus one in the hand and one in the shop, so a
+ * 6★ operator the chess pool does not carry can be deployed, sold, merged and inspected like any other piece. The board
+ * record is composed through shared/diy.js (pieceRecord), so art, name, class, bonds and the battle unit are the
+ * operator's (UnitInfo defId stays the slot's, with `diy` + `skillIndex`, exactly the sim's).
+ */
+function applyDiyVariant() {
+  const slots = data.get('backups')?.diy?.slots || {};
+  const slotId = Object.keys(slots).find((id) => slots[id].tier === DIY_TIER);
+  const slot = slotId ? data.lookup('chess', slotId) : null;
+  if (!slot) { console.warn('[mock] diy: no', DIY_TIER, 'tier slot'); return; }
+  const pick = { charId: DIY_CHAR, skillIndex: DIY_SKILL, ...(DIY_MODULE ? { uniEquipId: DIY_MODULE } : {}) };
+  const rec = composeDiy(slot, pick);
+  if (!rec) { console.warn('[mock] diy: the pick is not legal:', DIY_CHAR); return; }
+  S.priv.diy = { [slotId]: pick };
+  const piece = () => ({ uid: nextUid(), kind: 'chess', id: slotId, golden: false, tier: slot.tier, items: [] });
+  const at = S.priv.board[1] || S.priv.board[0];
+  if (at) {
+    const i = S.priv.board[1] ? 1 : 0;
+    S.priv.board[i] = { ...piece(), row: at.row, col: at.col };
+  } else S.priv.board.push({ ...piece(), row: 10, col: 5 });
+  const hand = S.priv.hand.findIndex((x) => !x);
+  if (hand >= 0) S.priv.hand[hand] = piece();
+  const shop = S.priv.shop.slots.findIndex((s) => s && s.kind === 'chess' && !s.sold);
+  if (shop >= 0) S.priv.shop.slots[shop] = { kind: 'chess', id: slotId, price: slot.price, basePrice: slot.price, sold: false };
 }
 
 /**
@@ -509,10 +569,14 @@ function startCombat(phase) {
   let id = 1;
   const board = S.priv.board;
   for (const p of board) {
-    const c = data.lookup('chess', p.id);
+    const c = pieceRecord(p);
+    const pick = c?.diyFor ? S.priv.diy?.[c.diyFor] : null;
     const colOff = 0;
     const r = boss ? p.row - 7 : p.row;
-    units.push({ id: id++, kind: 'op', side: 'ally', ownerId: ME, defId: p.id, name: c?.name, tier: c?.tier, golden: !!p.golden, spine: c?.charId, avatar: c?.assets?.avatar, x: p.col + colOff, y: r, facing: 1, maxHp: c?.stats?.maxHp || 1000, uid: p.uid });
+    // a 自选 piece is its operator (UnitInfo: defId = the slot, spine / avatar / name the operator's, `diy` + `skillIndex`)
+    units.push({ id: id++, kind: 'op', side: 'ally', ownerId: ME, defId: p.id, name: c?.name, tier: c?.tier ?? undefined, golden: !!p.golden,
+      spine: c?.charId, avatar: c?.assets?.avatar, x: p.col + colOff, y: r, facing: 1, maxHp: c?.stats?.maxHp || 1000, uid: p.uid,
+      ...(pick ? { diy: { ...pick }, skillIndex: pick.skillIndex ?? 0 } : {}) });
   }
   if (kind !== 'normal') {
     for (const p of board.slice(0, 5)) {
@@ -556,12 +620,33 @@ function startCombat(phase) {
   const spawned = new Set();
   let pausedFor = 0;
   let pausedSince = null;
+  // ?lethal — one lethal hit on the 自选 unit (else the first operator): the sim's 'substitute' fx switches the model to
+  // its <替身>; once the 20 s form and its 1 s switch would be over, the 'swap' fx switches it back. The switcher's
+  // COMBAT 自选 + 致命伤 and __MOCK__.lethal() fire one on demand (the auto one's clock starts with the battle, which
+  // may already be well past by the time the field is up).
+  const lethalUnit = allyState.find((u) => u.diy) || allyState[0] || null;
+  const lethalAt = lethalDelay();
+  let lethalHitAt = null;
+  let lethalBackAt = null;
+  let lethalPending = false;
   const tick = () => {
     // a paused solo battle stands still (the server's runner stops the clock too)
     if (S.pub.paused) { if (pausedSince == null) pausedSince = performance.now(); return; }
     if (pausedSince != null) { pausedFor += performance.now() - pausedSince; pausedSince = null; }
     const t = (performance.now() - t0 - pausedFor) / 1000 + 4;
     const ev = [];
+    const fire = (lethalAt != null && lethalHitAt == null && t >= 4 + lethalAt) || lethalPending;
+    if (lethalUnit && fire) {
+      lethalPending = false;
+      lethalHitAt = t;
+      lethalBackAt = null;
+      if (S.battle) S.battle.lethalInfo = { hitAt: t, backAt: null };
+      ev.push(['fx', 'substitute', lethalUnit.x, lethalUnit.y, { id: lethalUnit.id, form: 'doll', dur: 21 }]);
+    } else if (lethalUnit && lethalHitAt != null && lethalBackAt == null && t >= lethalHitAt + 21) {
+      lethalBackAt = t;
+      if (S.battle) S.battle.lethalInfo = { hitAt: lethalHitAt, backAt: t };
+      ev.push(['fx', 'swap', lethalUnit.x, lethalUnit.y, { id: lethalUnit.id, form: null }]);
+    }
     for (const d of deviceUnits) if (!spawned.has(d.id)) { spawned.add(d.id); ev.push(['spawn', { ...d }]); }
     for (const e of enemies) {
       if (e.dead || t < e.spawnAt) continue;
@@ -592,7 +677,11 @@ function startCombat(phase) {
     net._emit('b.snap', snap);
   };
   const e2boss = (e) => !!e.boss;
-  S.battle = { timer: setInterval(tick, 50), fieldRef, devices: deviceUnits, hurtDevice: (i = 0, dmg = 100) => {
+  S.battle = { timer: setInterval(tick, 50), fieldRef, devices: deviceUnits,
+    /** Fire the lethal hit on the 自选 / first operator now (the switcher's button, __MOCK__.lethal()). */
+    lethal: () => { if (lethalUnit) lethalPending = true; return !!lethalUnit; },
+    lethalInfo: null,
+    hurtDevice: (i = 0, dmg = 100) => {
     const d = deviceUnits[i];
     if (!d || d.deadAt != null) return false;
     d.hp = Math.max(0, d.hp - dmg);
@@ -866,6 +955,7 @@ const SWITCH = [
   ['PREP boss (L)', PHASE.PREP, 'boss'], ['PREP boss (R)', PHASE.PREP, 'bossR'], ['PREP 标准 同构体 + 调和', PHASE.PREP, 'funny,morph,harmony'],
   ['SP bounty', PHASE.SP_DRAFT, 'bounty'], ['SP supply', PHASE.SP_DRAFT, 'supply'], ['SP shop', PHASE.SP_DRAFT, 'shop'], ['SP tactic', PHASE.SP_DRAFT, 'tactic'], ['SP solo', PHASE.SP_DRAFT, 'solo'],
   ['COMBAT', PHASE.COMBAT, ''], ['COMBAT done', PHASE.COMBAT, 'done'], ['UNITE', PHASE.UNITE, ''], ['UNITE leaker', PHASE.UNITE, 'leaker'], ['SETTLE', PHASE.SETTLE, ''],
+  ['PREP 自选', PHASE.PREP, 'diy'], ['COMBAT 自选', PHASE.COMBAT, 'diy'], ['COMBAT 自选 + 致命伤', PHASE.COMBAT, 'diy,lethal'],
   ['FINAL_ASSAULT', PHASE.FINAL_ASSAULT, ''], ['FA overtime soon', PHASE.FINAL_ASSAULT, 'overtime'], ['FA draining', PHASE.FINAL_ASSAULT, 'drain'],
   ['HIDDEN_CORE', PHASE.HIDDEN_CORE, ''], ['COMBAT solo (pause)', PHASE.COMBAT, 'solo'], ['FA solo paused', PHASE.FINAL_ASSAULT, 'solo,paused'],
   ['RESULT win', PHASE.RESULT, ''], ['RESULT lose', PHASE.RESULT, 'defeat'],
@@ -911,6 +1001,6 @@ async function boot() {
   renderBar();
   store.subscribe(() => renderBar());
   globalThis.__MOCK__ = { store, S: () => S, setPhase, mutate: (fn) => { fn(S); refreshPrivate(); }, pushPublic: () => pushPublic(),
-    hurtDevice: (i, dmg) => S?.battle?.hurtDevice?.(i, dmg) ?? false };
+    hurtDevice: (i, dmg) => S?.battle?.hurtDevice?.(i, dmg) ?? false, lethal: () => S?.battle?.lethal?.() ?? false };
 }
 boot().catch((err) => console.error('[mock] boot failed', err));
