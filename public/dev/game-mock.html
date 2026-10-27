@@ -13,6 +13,9 @@
                       |diy (a 自选编队 piece on the board: &char=<charId>&slot=5|6&skill=0|1|2[&module=<uniEquipId>];
                               default 结城理 char_4217_makoto) — with the mockbar's 自选 buttons too
               &lethal[=<s>] (after <s> combat seconds, default 4, the 自选 unit takes a lethal hit: its <替身> switch)
+              &op=<charId>[,<charId>…]&opSkill=0&opElite=1 (ANY operator of the roster on the board — also the
+                      mockbar's OPERATOR picker; the bench borrows the 自选 slot's E2 status for operators without one)
+              &round=12..14 (or variant=late: a late-game round, 13 by default, with the elite / leader waves)
               &shot=1 (hide the switcher)  &render=engine|fallback (default: the Pixi engine, DOM fallback if it fails)
   Keyboard: ` toggles the switcher.
 -->

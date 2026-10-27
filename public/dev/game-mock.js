@@ -20,6 +20,8 @@ import { awayStore } from '/js/ui/matchChrome.js';
 import { GAME_FILES } from '/js/ui/gameComponents.js';
 import { PHASE, GEO } from '/shared/constants.js';
 import { diyRecordOf } from '/shared/diy.js';
+import { unitForm, statusKey } from '/shared/standIn.js';
+import { useState } from '/vendor/hooks.module.js';
 
 const params = new URLSearchParams(location.search);
 const SHOT = params.get('shot') === '1';
@@ -34,6 +36,16 @@ const DIY_CHAR = params.get('char') || 'char_4217_makoto';
 const DIY_TIER = Number(params.get('slot') || 6) === 5 ? 5 : 6;
 const DIY_SKILL = Math.max(0, Math.min(2, Number(params.get('skill') || 0)));
 const DIY_MODULE = params.get('module') || null;
+// ?op=<charId>&opSkill=0&opElite=1 — put ANY operator of the data (backups.units, the whole roster) on the board as a
+// 自选-slot piece (the mock borrows the slot's E2 status for operators without one; see mockOperatorPick). Repeatable:
+// ?op=a,b,c with ?opSkill=0,1,2. The mockbar's OPERATOR picker does the same at runtime.
+const OP_IDS = (params.get('op') || '').split(',').map((s) => s.trim()).filter(Boolean);
+const OP_SKILLS = (params.get('opSkill') || params.get('skill') || '0').split(',').map((s) => Number(s) || 0);
+const OP_ELITE = params.get('opElite') === '1' || VARIANTS.has('opElite');
+// ?round=12..14 (or the `late` variant) — a late-game board/round: 13 by default, with the elite and leader waves of the
+// final rounds as the coming enemies (and spawned in the fabricated battle), so the bench shows a hard fight.
+const ROUND = Math.max(0, Math.min(14, Number(params.get('round') || 0)));
+const lateRound = () => VARIANTS.has('late') || VARIANTS.has('hard') || ROUND >= 12;
 // ?lethal[=<s>] (or the `lethal` variant) — after <s> combat seconds (default 4) the 自选 unit takes a lethal hit: the
 // client draws the sim's 'substitute' fx, which switches it to its <替身> (and back after the 20 s form + 1 s switch, fx
 // 'swap'). The report this reproduces: 结城理 showed no substitute.
@@ -94,13 +106,145 @@ function composeDiy(slot, pick) {
 }
 /**
  * The record a board / hand piece shows: the operator of a 自选 slot this mock filled (m.private.diy), else the chess
- * record — the same lookup the match UI does (ui/gameLogic/diy.js diyGetter).
+ * record — the same lookup the match UI does (ui/gameLogic/diy.js diyGetter). ADIY piece's elite id is looked up by its
+ * base slot (`diyFor`), which is the key m.private.diy stores.
  */
 function pieceRecord(p) {
   if (!p || p.kind !== 'chess') return null;
   const c = data.lookup('chess', p.id);
-  const pick = c?.isDiy ? S?.priv?.diy?.[p.id] : null;
+  const pick = c?.isDiy
+    ? (S?.priv?.diy?.[c.diyFor || c.baseId || p.id] ?? S?.priv?.diy?.[p.id] ?? null)
+    : null;
   return (pick && typeof pick.charId === 'string' ? composeDiy(c, pick) : null) || c;
+}
+
+// ---- operator picker (dev bench: ANY operator of the roster, not only the 自选 pool) -------------------------------
+
+/** Every operator the data can field: the chess pool's characters (their own record) then the backups roster. */
+function allOperators() {
+  const seen = new Set();
+  const out = [];
+  for (const c of data.list('chess')) {
+    if (c.chessType !== 'NORMAL' || c.isGolden || !c.charId || seen.has(c.charId)) continue;
+    seen.add(c.charId);
+    out.push({ charId: c.charId, name: c.name || c.charId, rarity: c.rarity ?? 0, tier: c.tier ?? 0, chessId: c.chessId, pool: true });
+  }
+  for (const [charId, u] of Object.entries(data.get('backups')?.units ?? {})) {
+    if (!u || seen.has(charId)) continue;
+    seen.add(charId);
+    out.push({ charId, name: u.name || charId, rarity: u.rarity ?? 0, pool: false });
+  }
+  return out.sort((a, b) => a.name.localeCompare(b.name, 'zh-Hans-CN'));
+}
+
+/** The best form of `charId` (E2, then the highest level) — the picker's skill list and the borrowed status. */
+function bestForm(unit) {
+  const forms = unit?.forms ?? {};
+  const keys = Object.keys(forms);
+  if (!keys.length) return null;
+  const rank = (k) => (k.startsWith('2/') ? 3 : k.startsWith('1/') ? 2 : 1);
+  keys.sort((a, b) => rank(b) - rank(a) || b.localeCompare(a, 'en', { numeric: true }));
+  return forms[keys[0]];
+}
+
+/** The chess record of a pool operator (none for a backups-only operator), or null. */
+function poolChessOf(charId) {
+  return data.list('chess').find((c) => c.chessType === 'NORMAL' && !c.isGolden && c.charId === charId) || null;
+}
+
+/** The number of skills the picker offers for a charId (a pool operator's `skills[]`, else its best form's). */
+function skillCountOf(charId) {
+  const c = poolChessOf(charId);
+  if (c) return Math.max(1, (c.skills ?? []).length);
+  return Math.max(1, (bestForm(data.get('backups')?.units?.[charId])?.skills ?? []).length);
+}
+
+/**
+ * Make `charId` a legal pick of the 自选 `slot` for this dev page, and return the pick `{ charId, skillIndex,
+ * uniEquipId }` (or null).
+ *
+ * Mock-only, never persisted: the character is added to `backups.diy.ownedPool` (the server's 6★-pick rule), and an
+ * operator without the slot's E2 status gets it ALIASED to its own best form — so the composed record is the operator at
+ * its strongest, under the slot's tier/price/merge identity. A real match refuses both; the bench only renders.
+ */
+function mockOperatorPick(slot, charId, skillIndex = 0) {
+  const b = data.get('backups');
+  const unit = b?.units?.[charId];
+  const diy = b?.diy;
+  if (!slot?.isDiy || !unit || !diy) return null;
+  if (!Array.isArray(diy.ownedPool)) diy.ownedPool = [];
+  if (!diy.ownedPool.includes(charId)) diy.ownedPool.push(charId);
+  if (!unit.forms) unit.forms = {};
+  const key = statusKey(slot.status);
+  if (!unit.forms[key]) {
+    const best = bestForm(unit);
+    if (!best) return null;
+    unit.forms[key] = best;
+  }
+  const form = unit.forms[key];
+  const n = Math.max(1, (form.skills ?? []).length);
+  const skill = Math.max(0, Math.min(n - 1, Number.isInteger(skillIndex) ? skillIndex : 0));
+  if (!unitForm(b, charId, slot.status)?.skills?.some((s) => s && s.index === skill)) return null;
+  return { charId, skillIndex: skill, uniEquipId: null };
+}
+
+let opCursor = 0;
+/**
+ * Put `charId` on the board as the `elite` (or normal) form of a 自选 slot, in place of the piece at `index` (the
+ * picker cycles through the board's own pieces), and return the composed record. `m.private.diy` gets the pick, so the
+ * whole match UI draws/deploys it like a 自选 piece (composed record for art, name, class, bonds, skill).
+ */
+function placeMockOperator(charId, { skill = 0, elite = OP_ELITE, index = null } = {}) {
+  if (!S?.priv) return null;
+  const board = S.priv.board;
+  const at = Number.isInteger(index) && board[index] ? index : opCursor++ % Math.max(1, board.length);
+  const tile = board[at] || board[0];
+  const put = (piece) => {
+    if (tile) { piece.row = tile.row; piece.col = tile.col; board[at] = piece; }
+    else board.push({ ...piece, row: 10, col: 5 });
+    refreshPrivate();
+    return piece;
+  };
+  // a chess-pool operator: its own record (real tier/stats), the skill through m.private.loadout (the 干员调配 switch)
+  const pool = poolChessOf(charId);
+  if (pool) {
+    const n = Math.max(1, (pool.skills ?? []).length);
+    const sk = Math.max(0, Math.min(n - 1, Number.isInteger(skill) ? skill : 0));
+    S.priv.loadout = { ...(S.priv.loadout || {}), [pool.chessId]: { skill: sk, module: null } };
+    const id = elite && pool.goldenId ? pool.goldenId : pool.chessId;
+    put({ uid: nextUid(), kind: 'chess', id, golden: !!elite, tier: pool.tier, items: [] });
+    return data.lookup('chess', id) ?? pool;
+  }
+  // a backups-only operator (outside the pool): the 自选 slot path, borrowing the slot's E2 status when needed
+  const slots = data.get('backups')?.diy?.slots || {};
+  const slotId = Object.keys(slots).find((id) => slots[id].tier === DIY_TIER) || Object.keys(slots)[0];
+  const slot = slotId ? data.lookup('chess', slotId) : null;
+  if (!slot) return null;
+  const pick = mockOperatorPick(slot, charId, skill);
+  if (!pick) { console.warn('[mock] operator pick refused:', charId); return null; }
+  const chessId = elite ? slots[slotId].goldenId : slotId;
+  S.priv.diy = { ...(S.priv.diy || {}), [slotId]: pick };
+  put({ uid: nextUid(), kind: 'chess', id: chessId, golden: !!elite, tier: slots[slotId].tier, items: [] });
+  return composeDiy(data.lookup('chess', chessId), pick);
+}
+
+/** Re-enter the current combat with the (changed) board, or just refresh a prep board. */
+function relaunchBattle() {
+  const phase = S?.pub?.phase;
+  if (![PHASE.COMBAT, PHASE.UNITE, PHASE.SETTLE, PHASE.FINAL_ASSAULT, PHASE.HIDDEN_CORE].includes(phase)) { refreshPrivate(); return; }
+  stopBattle();
+  startCombat(phase);
+}
+
+/** Drop every 自选-slot piece this mock filled (m.private.diy + the pieces that would render as 甄选干员). */
+function clearMockOperators() {
+  if (!S?.priv) return;
+  const isDiy = (p) => !!p && p.kind === 'chess' && !!data.lookup('chess', p.id)?.isDiy;
+  S.priv.diy = {};
+  S.priv.board = S.priv.board.filter((p) => !isDiy(p));
+  S.priv.hand = S.priv.hand.map((p) => (isDiy(p) ? null : p));
+  S.priv.shop.slots = S.priv.shop.slots.map((s) => (s && s.kind === 'chess' && isDiy(s) ? null : s));
+  relaunchBattle();
 }
 
 // the mock server's bond counts: BOARD distinct members, plus 调和 (maniShip) like server/match/bondsMeta.js — a 调和
@@ -252,12 +396,17 @@ function buildState() {
 
   const enemies = data.list('enemies');
   const byRank = (r) => enemies.filter((e) => e.rank === r && !e.key.includes('template'));
-  // m.private.nextEnemies (server/match/waves.js previewOf): one entry per spawn action, in spawn order
+  // m.private.nextEnemies (server/match/waves.js previewOf): one entry per spawn action, in spawn order. A late round
+  // (?round / `late`) fields the elite and leader waves of the closing rounds instead — the bench's hard fight.
   const flyOf = (e) => e.stats?.motion === 'FLY' || !!e.isFlyEnemy;
-  const nextEnemies = [
+  const nextEnemies = !lateRound() ? [
     ...shuffle(byRank('NORMAL')).slice(0, 4).map((e, i) => ({ enemyKey: e.key, count: [8, 6, 4, 3][i], gate: i % 2 ? 'upper' : 'lower', t: [3, 5, 12, 15][i], fly: flyOf(e), elite: false, boss: false, source: 'wave', tag: null })),
     ...shuffle(byRank('ELITE')).slice(0, 2).map((e, i) => ({ enemyKey: e.key, count: 1, gate: i ? 'upper' : 'lower', t: 18 + i * 6, fly: flyOf(e), elite: true, boss: false, source: 'wave', tag: null })),
     (() => { const e = pick(byRank('ELITE')); return { enemyKey: e.key, count: 1, gate: 'lower', t: 20, fly: flyOf(e), elite: true, boss: false, source: 'bounty', tag: 'bounty' }; })(),
+  ].sort((a, b) => a.t - b.t) : [
+    ...shuffle(byRank('ELITE')).slice(0, 4).map((e, i) => ({ enemyKey: e.key, count: [3, 2, 3, 2][i], gate: i % 2 ? 'upper' : 'lower', t: 2 + i * 4, fly: flyOf(e), elite: true, boss: false, source: 'wave', tag: null })),
+    ...shuffle(byRank('NORMAL')).slice(0, 1).map((e) => ({ enemyKey: e.key, count: 8, gate: 'lower', t: 14, fly: flyOf(e), elite: false, boss: false, source: 'wave', tag: null })),
+    ...shuffle(byRank('BOSS')).slice(0, 1).map((e) => ({ enemyKey: e.key, count: 1, gate: 'upper', t: 18, fly: flyOf(e), elite: false, boss: true, source: 'wave', tag: null })),
   ].sort((a, b) => a.t - b.t);
 
   const priv = {
@@ -302,6 +451,8 @@ function buildState() {
       playerIds: players.filter((p) => Math.floor(p.seat / 4) === g).map((p) => p.playerId) })) } : null),
   };
   if (VARIANTS.has('boss') || VARIANTS.has('bossR')) pub.round = pub.bossRound;
+  // ?round=12..14 / `late`: the closing rounds of a match (the hard enemy waves above)
+  if (lateRound()) pub.round = ROUND || 13;
   if (VARIANTS.has('kickvote')) pub.kickVote = { id: 1, proposerId: 'p3', targetId: 'p4',
     voters: ['p1', 'p3'], agreed: ['p3'], rejected: [], need: 2, deadline: Date.now() + 24000 };
   S = { stage, pub, priv, layers: {}, battle: null, pool, requests: [] };
@@ -345,8 +496,10 @@ function applyDiyVariant() {
   const slotId = Object.keys(slots).find((id) => slots[id].tier === DIY_TIER);
   const slot = slotId ? data.lookup('chess', slotId) : null;
   if (!slot) { console.warn('[mock] diy: no', DIY_TIER, 'tier slot'); return; }
-  const pick = { charId: DIY_CHAR, skillIndex: DIY_SKILL, ...(DIY_MODULE ? { uniEquipId: DIY_MODULE } : {}) };
-  const rec = composeDiy(slot, pick);
+  const pick = DIY_MODULE
+    ? { charId: DIY_CHAR, skillIndex: DIY_SKILL, uniEquipId: DIY_MODULE }
+    : mockOperatorPick(slot, DIY_CHAR, DIY_SKILL);
+  const rec = pick ? composeDiy(slot, pick) : null;
   if (!rec) { console.warn('[mock] diy: the pick is not legal:', DIY_CHAR); return; }
   S.priv.diy = { [slotId]: pick };
   const piece = () => ({ uid: nextUid(), kind: 'chess', id: slotId, golden: false, tier: slot.tier, items: [] });
@@ -402,11 +555,17 @@ function mockLoadout(board, slots) {
 function setPhase(phase, variant) {
   stopBattle();
   clearInterval(stormTimer);
-  buildState();
+  // the variant is in force while the state is built (dead / frozen / temp / players20 / late read it there)
   for (const v of (variant || '').split(',').filter(Boolean)) VARIANTS.add(v);
+  buildState();
   if (VARIANTS.has('reward') && !S.priv.shop.rewardOffer) S.priv.shop.rewardOffer = { tier: 5, slots: shuffle(visibleChess(5)).slice(0, 3).map((c) => ({ kind: 'chess', id: c.chessId, price: 0, sold: false })) };
   if (VARIANTS.has('temp') && !S.priv.temp.some(Boolean)) { S.priv.temp[0] = chessPiece(pick(S.pool)); S.priv.temp[1] = itemPiece(shopItems()[2]); }
   applyGapVariants();
+  // ?op=… — the chosen operators go on the board before the phase's own setup (a combat phase then streams them)
+  if (OP_IDS.length) {
+    opCursor = 0;
+    OP_IDS.forEach((id, i) => placeMockOperator(id, { skill: OP_SKILLS[i % OP_SKILLS.length] }));
+  }
   const pub = S.pub;
   pub.phase = phase;
   store.set({ match: emptyMatch(), ticker: [], emotes: [] });
@@ -497,7 +656,7 @@ function stopBattle() { if (S?.battle?.timer) clearInterval(S.battle.timer); if 
 function startCombat(phase) {
   const pub = S.pub;
   const boss = phase === PHASE.FINAL_ASSAULT || phase === PHASE.HIDDEN_CORE;
-  pub.round = boss ? (phase === PHASE.HIDDEN_CORE ? 15 : 14) : 6;
+  pub.round = boss ? (phase === PHASE.HIDDEN_CORE ? 15 : 14) : lateRound() ? (ROUND || 13) : 6;
   pub.deadline = boss ? Date.now() + 95000 : Date.now() + 40000;
   // boss rounds (server Match: deadline = the level's 120 s countdown, overtimeAt = the drain start at 150 s):
   // `overtime` = the level time ran out, the drain starts in 18 s; `drain` = draining for 7 s
@@ -571,12 +730,13 @@ function startCombat(phase) {
   for (const p of board) {
     const c = pieceRecord(p);
     const pick = c?.diyFor ? S.priv.diy?.[c.diyFor] : null;
+    const loadout = pick ? null : S.priv.loadout?.[data.lookup('chess', p.id)?.baseId || p.id];
     const colOff = 0;
     const r = boss ? p.row - 7 : p.row;
     // a 自选 piece is its operator (UnitInfo: defId = the slot, spine / avatar / name the operator's, `diy` + `skillIndex`)
     units.push({ id: id++, kind: 'op', side: 'ally', ownerId: ME, defId: p.id, name: c?.name, tier: c?.tier ?? undefined, golden: !!p.golden,
       spine: c?.charId, avatar: c?.assets?.avatar, x: p.col + colOff, y: r, facing: 1, maxHp: c?.stats?.maxHp || 1000, uid: p.uid,
-      ...(pick ? { diy: { ...pick }, skillIndex: pick.skillIndex ?? 0 } : {}) });
+      ...(pick ? { diy: { ...pick }, skillIndex: pick.skillIndex ?? 0 } : Number.isInteger(loadout?.skill) ? { skillIndex: loadout.skill } : {}) });
   }
   if (kind !== 'normal') {
     for (const p of board.slice(0, 5)) {
@@ -589,13 +749,15 @@ function startCombat(phase) {
   }
   const enemyKeys = S.priv.nextEnemies.map((e) => e.enemyKey);
   const enemies = [];
-  const nEnemy = boss ? 10 : 12;
+  // a late round streams the elite/leader waves longer (the same pool nextEnemies previews)
+  const nEnemy = boss ? 10 : lateRound() ? 18 : 12;
   for (let i = 0; i < nEnemy; i++) {
     const key = enemyKeys[i % enemyKeys.length];
     const e = data.lookup('enemies', key);
     const y = boss ? [2, 5, 3][i % 3] : [9, 12][i % 2];
     const startX = boss ? (i % 2 ? 17 : 3) : kind === 'unite' ? 18 : 10; // escaped_multi: the right half's gates
-    enemies.push({ id: id++, kind: 'enemy', side: 'enemy', ownerId: ME, defId: key, name: e?.name, spine: key, avatar: key, x: startX + rnd() * 0.3, y, facing: -1, maxHp: e?.stats?.maxHp || 3000, hp: e?.stats?.maxHp || 3000, spawnAt: i * 0.9, dir: boss ? (i % 2 ? -1 : 1) : -1, dead: false });
+    const maxHp = e?.stats?.maxHp || 3000;
+    enemies.push({ id: id++, kind: 'enemy', side: 'enemy', ownerId: ME, defId: key, name: e?.name, spine: key, avatar: key, x: startX + rnd() * 0.3, y, facing: -1, maxHp, hp: maxHp, spawnAt: i * 0.9, dir: boss ? (i % 2 ? -1 : 1) : -1, dead: false });
   }
   if (boss) {
     const bossRec = data.lookup('bosses', phase === PHASE.HIDDEN_CORE ? 'boss_8' : 'boss_5');
@@ -956,15 +1118,37 @@ const SWITCH = [
   ['SP bounty', PHASE.SP_DRAFT, 'bounty'], ['SP supply', PHASE.SP_DRAFT, 'supply'], ['SP shop', PHASE.SP_DRAFT, 'shop'], ['SP tactic', PHASE.SP_DRAFT, 'tactic'], ['SP solo', PHASE.SP_DRAFT, 'solo'],
   ['COMBAT', PHASE.COMBAT, ''], ['COMBAT done', PHASE.COMBAT, 'done'], ['UNITE', PHASE.UNITE, ''], ['UNITE leaker', PHASE.UNITE, 'leaker'], ['SETTLE', PHASE.SETTLE, ''],
   ['PREP 自选', PHASE.PREP, 'diy'], ['COMBAT 自选', PHASE.COMBAT, 'diy'], ['COMBAT 自选 + 致命伤', PHASE.COMBAT, 'diy,lethal'],
+  ['PREP 后期 R13', PHASE.PREP, 'late'], ['COMBAT 后期 R13', PHASE.COMBAT, 'late'],
   ['FINAL_ASSAULT', PHASE.FINAL_ASSAULT, ''], ['FA overtime soon', PHASE.FINAL_ASSAULT, 'overtime'], ['FA draining', PHASE.FINAL_ASSAULT, 'drain'],
   ['HIDDEN_CORE', PHASE.HIDDEN_CORE, ''], ['COMBAT solo (pause)', PHASE.COMBAT, 'solo'], ['FA solo paused', PHASE.FINAL_ASSAULT, 'solo,paused'],
   ['RESULT win', PHASE.RESULT, ''], ['RESULT lose', PHASE.RESULT, 'defeat'],
   ['PREP 20 players', PHASE.PREP, 'players20'], ['PREP 20 + roster + emote storm', PHASE.PREP, 'players20,roster,emotestorm'],
   ['COMBAT 20 players', PHASE.COMBAT, 'players20'],
 ];
+let OP_LIST = null;
 function Switcher() {
   const cur = store.get().match.public?.phase;
-  return html`<h4>PHASE</h4>${SWITCH.map(([label, ph, v]) => html`<button class=${cur === ph ? 'on' : ''} onClick=${() => { VARIANTS.clear(); setPhase(ph, v); renderBar(); }}>${label}</button>`)}
+  if (!OP_LIST) OP_LIST = allOperators();
+  const [opId, setOpId] = useState(OP_IDS[0] || 'char_4217_makoto');
+  const [opSkill, setOpSkill] = useState(OP_SKILLS[0] ?? 0);
+  const [opElite, setOpElite] = useState(OP_ELITE);
+  const nSkills = skillCountOf(opId);
+  const place = () => {
+    if (!placeMockOperator(opId, { skill: opSkill, elite: opElite })) return;
+    relaunchBattle();
+    renderBar();
+  };
+  return html`<h4>OPERATOR (全干员)</h4>
+    <select value=${opId} onChange=${(e) => { setOpId(e.target.value); setOpSkill(0); }} aria-label="干员">
+      ${OP_LIST.map((o) => html`<option value=${o.charId}>${o.name}${o.rarity ? ` ${o.rarity}★` : ''}</option>`)}
+    </select>
+    <select value=${String(opSkill)} onChange=${(e) => setOpSkill(Number(e.target.value))} aria-label="技能">
+      ${Array.from({ length: nSkills }, (_, i) => html`<option value=${String(i)}>技能 ${i + 1}</option>`)}
+    </select>
+    <label><input type="checkbox" checked=${opElite} onChange=${(e) => setOpElite(e.target.checked)} /> 精英 (E2)</label>
+    <button onClick=${place}>放入棋盘</button>
+    <button onClick=${() => { clearMockOperators(); renderBar(); }}>清空自选</button>
+    <h4>PHASE</h4>${SWITCH.map(([label, ph, v]) => html`<button class=${cur === ph ? 'on' : ''} onClick=${() => { VARIANTS.clear(); setPhase(ph, v); renderBar(); }}>${label}</button>`)}
     <h4>EVENTS</h4>
     <button onClick=${() => { const now = Date.now(); store.set((s) => ({ emotes: [...s.emotes, { seq: now, playerId: pick(['p3', 'ai_2', 'p4']), id: pick(['autochess_battle_happy', 'slug_autochess_battle_thanks', 'autochess_battle_call', 'autochess_battle_fooldoctor_05', 'autochess_battle_foolamiya_03', 'autochess_battle_foolwisdel_01']), at: now }] })); }}>teammate emote</button>
     <button onClick=${() => store.set((s) => ({ ticker: [...s.ticker, { id: Date.now(), text: `<@ba.vup>${pick(['Doctor·B', '灰烬'])}博士</>将调度中心等级提升为5级`, at: Date.now() }] }))}>ticker</button>
@@ -1001,6 +1185,10 @@ async function boot() {
   renderBar();
   store.subscribe(() => renderBar());
   globalThis.__MOCK__ = { store, S: () => S, setPhase, mutate: (fn) => { fn(S); refreshPrivate(); }, pushPublic: () => pushPublic(),
-    hurtDevice: (i, dmg) => S?.battle?.hurtDevice?.(i, dmg) ?? false, lethal: () => S?.battle?.lethal?.() ?? false };
+    hurtDevice: (i, dmg) => S?.battle?.hurtDevice?.(i, dmg) ?? false, lethal: () => S?.battle?.lethal?.() ?? false,
+    /** Put any operator of the roster on the board (the OPERATOR picker): `(charId, { skill, elite })`. */
+    placeOperator: (charId, o = {}) => { const rec = placeMockOperator(charId, o); if (rec) relaunchBattle(); return rec; },
+    /** Re-enter the current combat (a changed board / settings), or refresh a prep board. */
+    relaunch: () => relaunchBattle() };
 }
 boot().catch((err) => console.error('[mock] boot failed', err));
