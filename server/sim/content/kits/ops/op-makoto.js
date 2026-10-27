@@ -17,9 +17,10 @@
 // - TODO(doll-talent) T1 不羁之力 (+40 % ATK / +35 % HP / longer interval while the 替身 fights) and T2 S.E.E.S.队长
 //   (the squad's total attack when the 替身 ends): both need a harness-verified doll-state hook before they are added;
 //   an unverified approximation would be worse than none. Documented, not silently dropped.
-// - The persona model: the client draws a 傀儡师's 替身 from the operator skeleton's *_B clips (professions.js,
-//   render/units.js FORMS). Whether char_4217_makoto's spine carries them is checked separately; if not, the 替身 shows
-//   the ordinary model until the art pass.
+// - The persona model: his skeleton names the 替身 clips Doll_Skill_1_* / Doll_Skill_2_* / Doll_Skill_3_P2_* (no *_B
+//   clips), and the <替身> is a Persona that follows the equipped skill — S1 俄耳甫斯, S2 塔纳托斯, S3's 俄耳甫斯 that
+//   its text summons on a doomed hit. render/units.js FORMS carries one `doll` clip set per skill variant (dollForms,
+//   picked by the pick's skillIndex), so the switch plays the persona's own clips; see test/render/makoto-doll.test.js.
 import { num, skillRec } from '../shared/tier1.js';
 
 const S1 = 'skchr_makoto_1';

@@ -335,6 +335,8 @@ export const WOLF_PIPS = Object.freeze({ size: 0.1, min: 5, max: 9, gap: 2, pad:
  *   the 替身's death clip, so a 替身 knocked out lies on the Front model like every knocked-out operator facing UP
  *   (_wantsBack). The sim resets the form right after the 'die' event; the form it died in (`_dieForm`) gives the model
  *   built for the knock-out — and one rebuilt while it is down — the 替身's death clip; it stands up as the 本体.
+ *   结城理 (char_4217_makoto): his 替身 is a Persona whose clips follow the equipped skill (dollForms — S1 俄耳甫斯, S2
+ *   塔纳托斯, S3's 俄耳甫斯), so the form has one clip set per skill variant.
  * A kind without a clip set of this skeleton (barriers, charges, …) changes nothing. 吉兆飞鳞's 晕眩模式 is its Stun clip.
  */
 /**
@@ -375,6 +377,24 @@ const PRISONER_COLOURED = prisoner('_orange', '_red');
 const dollRoles = (idle, die, attack = null) => Object.freeze({
   idle, deploy: idle, die, attack: attack ? Object.freeze({ begin: null, loop: attack, end: null }) : null, attackDown: null, skill: null,
 });
+/**
+ * A 傀儡师's 替身 clip set, with its switch clips: `change` fades the 替身 in, `leave` plays as the 本体 comes back. `stun`
+ * (when the skeleton has one) holds while it is stunned.
+ */
+const dollSet = (idle, die, attack, change, leave, stun = null) => Object.freeze({
+  change, leave,
+  roles: Object.freeze({
+    ...dollRoles(idle, die, attack),
+    stun: stun ? loop(stun) : null,
+  }),
+});
+/**
+ * A model form whose clip set follows the unit's equipped skill (`variants`, picked by `skillIndex` in _formSpec): a
+ * 傀儡师 whose <替身> is not one fixed model. Display only — the sim's form name stays the same for every variant.
+ */
+const dollForms = (...variants) => Object.freeze({ variants: Object.freeze(variants) });
+/** A skill-keyed variant's index: `skillIndex` clamped to the list (variant 0 when unknown). */
+const variantIndex = (skillIndex, n) => Math.min(n - 1, Math.max(0, Number.isInteger(skillIndex) ? skillIndex : 0));
 export const FORMS = Object.freeze({
   [MANIFOLD]: Object.freeze({
     Default: Object.freeze({ roles: { ...clipSet('Idle_1', null, 'Stun', 'Attack'), deploy: 'Start', stun: loop('Stun') } }),
@@ -389,6 +409,18 @@ export const FORMS = Object.freeze({
   }),
   char_4016_kazema: Object.freeze({
     doll: Object.freeze({ change: 'Start_B', leave: 'Start', roles: dollRoles('Idle_B', 'Die_B', 'Attack_B') }),
+  }),
+  // 结城理 (char_4217_makoto, 自选 6★ 傀儡师): his <替身> is a Persona that follows the equipped skill — S1 俄耳甫斯,
+  // S2 塔纳托斯, S3's 替身 the 俄耳甫斯 it summons on a doomed hit ("塔纳托斯在场时，开启技能或受到致命伤时改为召唤俄耳甫斯").
+  // The variant is picked by the pick's skill (`skillIndex`, dollForms). [ASSUMED]: S3's P1→P2 conversion clips
+  // (Doll_Skill_3_P1toP2_ChangeBegin/_End) are not replayed — the switch summons the P2 俄耳甫斯 directly on its P2 set,
+  // with the persona's own switch-in clip; S2's 塔纳托斯 has no attack clip of its own, so its loop covers the attacks.
+  char_4217_makoto: Object.freeze({
+    doll: dollForms(
+      dollSet('Doll_Skill_1_Idle', 'Doll_Skill_1_Die', 'Doll_Skill_1_Attack', 'Doll_Skill_1_SwitchIn', 'Doll_Skill_1_SwitchOut', 'Doll_Skill_1_Stun'),
+      dollSet('Doll_Skill_2_Loop', 'Doll_Skill_2_Die', 'Doll_Skill_2_Loop', 'Doll_Skill_2_SwitchIn', 'Doll_Skill_2_SwitchOut', 'Doll_Skill_2_Stun'),
+      dollSet('Doll_Skill_3_P2_Loop', 'Doll_Skill_3_P2_Die', 'Doll_Skill_3_P2_Loop', 'Doll_Skill_1_SwitchIn', 'Doll_Skill_3_P2_SwitchOut', 'Doll_Skill_3_P2_Stun'),
+    ),
   }),
   enemy_1040_bombd: Object.freeze({
     bombed: Object.freeze({
@@ -469,10 +501,13 @@ export function playedClips(anims, forms = null) {
   };
   roles(anims);
   if (forms && typeof forms === 'object') {
-    for (const f of Object.values(forms)) {
-      if (!f || typeof f !== 'object') continue;
-      add(f.change, true); add(f.end, true); add(f.leave, true);
-      roles(f.roles);
+    for (const spec of Object.values(forms)) {
+      // a skill-keyed form (dollForms): every variant's clips can be played
+      for (const f of spec && Array.isArray(spec.variants) ? spec.variants : [spec]) {
+        if (!f || typeof f !== 'object') continue;
+        add(f.change, true); add(f.end, true); add(f.leave, true);
+        roles(f.roles);
+      }
     }
   }
   return out;
@@ -999,7 +1034,9 @@ export class UnitView {
 
   _formSpec() {
     const form = this.form || (isManifold(this.info) ? 'Default' : null);
-    const f = form ? FORMS[this.info.spine || this.info.defId]?.[form] || null : null;
+    const spec = form ? FORMS[this.info.spine || this.info.defId]?.[form] || null : null;
+    // a form whose clip set follows the equipped skill (dollForms: 结城理's Persona)
+    const f = spec && spec.variants ? spec.variants[variantIndex(this.info.skillIndex, spec.variants.length)] || null : spec;
     if (f?.combat && this._manifoldCombat) return { ...f, roles: { ...f.roles, attack: loop(f.combat), skill: { ...f.roles.skill, loop: f.combat } } };
     return f;
   }

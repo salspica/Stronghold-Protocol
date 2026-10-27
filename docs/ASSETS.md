@@ -635,6 +635,9 @@ pose carried over (`render/spine.js syncFormPose`). The forms:
   Neither Back skeleton has the 替身's death clip, so a 替身 knocked out lies on the Front model (like every knocked-out
   operator facing up, DESIGN §22.1) with its `Die_B_2` / `Die_B`: the view keeps the form it died in for that model and
   for one rebuilt while it lies down, although the sim resets the form right after the knock-out.
+  The 替身 is not always a fixed `*_B` set: 结城理 (char_4217_makoto) names his Persona's clips `Doll_Skill_1_*` (俄耳甫斯),
+  `Doll_Skill_2_*` (塔纳托斯) and `Doll_Skill_3_P2_*` (the 俄耳甫斯 its S3 summons on a doomed hit), one set per equipped
+  skill — `render/units.js FORMS` carries them as skill-keyed variants (`dollForms`, picked by the pick's `skillIndex`).
 
 Not mapped (clip names ambiguous): “自在”, “巨大的丑东西”, 主角阵营角色 and “余音” (`*_A` / `*_B`: which of its two forms is A
 is not known) keep their manifest clips.
