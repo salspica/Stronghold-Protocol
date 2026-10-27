@@ -58,9 +58,9 @@ export const PROJECTILE_SPEED = 12;
  * Projectile speeds per visual kind (tiles/s). `none`/`beam` are instant. `boomerang` (回环射手 跃跃) is the OUTBOUND
  * flight to the target — PRTS 跃跃 特性 note "投射物飞行速度15，返回时飞行速度3.75"; the way back is
  * BOOMERANG_RETURN_SPEED (ai.js throwBoomerang). `droneBomb` = 暴鸰's bomb (the official projectile_bombd `_speed` 5;
- * content/enemies/fly.js kitBombd).
+ * content/enemies/fly.js kitBombd). `note` = 丰川祥子's 音符 (content/notes.js NOTE_SPEED).
  */
-export const PROJECTILE_SPEEDS = Object.freeze({ arrow: 14, bolt: 11, bomb: 8, lob: 8, orb: 10, drone: 16, enemy: 10, boomerang: 15, droneBomb: 5 });
+export const PROJECTILE_SPEEDS = Object.freeze({ arrow: 14, bolt: 11, bomb: 8, lob: 8, orb: 10, drone: 16, enemy: 10, boomerang: 15, droneBomb: 5, note: 12 });
 /** 回环射手: speed (tiles/s) of a boomerang flying back from its hit point to its thrower (PRTS "返回时飞行速度3.75"). */
 export const BOOMERANG_RETURN_SPEED = 3.75;
 

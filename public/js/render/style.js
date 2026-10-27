@@ -159,6 +159,8 @@ export const PROJ = Object.freeze({
   // 暴鸰's bomb (sim content/enemies/fly.js kitBombd; official projectile_bombd, speed 5): dropped from the drone, it falls
   // onto its target with a low arc and bursts where the sim's 'explode' blast goes off
   droneBomb: { look: 'shell', speed: 5, once: true, tint: 0xffe2c8, glow: 0xff5a3a, len: 0.6, width: 0.3, head: 0.5, trail: 0xff7a4a, arc: 0.35, smoke: 0x2e2824, hit: 'boom' },
+  // 丰川祥子's 音符 (sim content/notes.js): a glowing note that keeps homing; its own 'noteHit' burst marks the landing
+  note: { look: 'orb', speed: 12, tint: 0xffe6fb, glow: 0xff7ad9, len: 0.5, width: 0.3, head: 0.46, trail: 0xff9ad5, muzzle: 0xffb3e6, hit: 'arts' },
 });
 
 /** Status keys (b.ev 'status' + UF flags) → icon atlas key (render/textures.js) and colour. */

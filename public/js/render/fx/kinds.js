@@ -90,6 +90,8 @@ export const FX_KINDS = Object.freeze({
   // bonds / garrisons (support/index.js fxOn)
   bondMilestone: { a: 'buff', c: 0xffc600 }, bondProc: { a: 'buff', c: 0x4ed8af }, bondShare: { a: 'wave', c: 0x4ed8af },
   garrison: { a: 'buff', c: 0x4ed8af }, layer: { a: 'buff', c: 0xffe066 }, sp: { a: 'sp', c: 0x6fd3ff },
+  // 丰川祥子's 音符 (content/notes.js): the cast's pulse and the note's landing burst (the flight is the 'note' projectile)
+  note: { a: 'wave', c: 0xff9ad5, r: 0.6 }, noteHit: { a: 'buff', c: 0xffb3e6 },
 });
 
 /** Keyword guesses for kinds added later (checked in order), before the generic sparkle. */
