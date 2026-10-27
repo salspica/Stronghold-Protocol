@@ -9,7 +9,9 @@
 // - the picks of a tier: the owned 6★ outside the chess pool (`diy.ownedPool`: no preset operator, no collab) and the
 //   nine 6★ prototypes at both tiers, the six 4★ reserves (not 先锋 / 特种) at tier 5 only (`diy.prototypes[tier]`);
 // - a prototype may fill one tier-5 and one tier-6 slot, an owned operator one slot; the two picks of a tier differ;
-// - no 特质 (PRTS "甄选加入的干员不会拥有任何特质"); bonds from the operator's factions (`diy.operators[id].bonds`);
+// - no 特质 (PRTS "甄选加入的干员不会拥有任何特质"), except the two hand-designed collab picks below, which carry one
+//   record per form (`diy.operators[id].garrisons`, tools/build-data.mjs DIY_GARRISON_IDS); bonds from the operator's
+//   factions (`diy.operators[id].bonds`);
 // - the normal form is E2 Lv1, skill rank 4, no module; the elite E2 Lv60, rank 7, its module at stage 1 (tier 5) or 3
 //   (tier 6) — the slot record's `status` (activity_table diyChessDict) picks the unit form;
 // - an owned pick chooses its skill (any of 3) and module (any of its modules, or none — a roster never carries a module
@@ -194,7 +196,8 @@ export function checkDiyPick(slotId, pick, data) {
 
 /**
  * A 自选 slot record (either form) filled with a checked pick: composeUnitRecord of the slot's identity (tier, price,
- * merge, status; no 特质) with the operator's form at the slot's status — an owned pick's at `potential` (1–6, default
+ * merge, status; no 特质 by default, the two hand-designed picks' own record of this form instead) with the operator's
+ * form at the slot's status — an owned pick's at `potential` (1–6, default
  * 6: shared/potential.js atPotential) — the pick's skill and module (active on the elite form only), the derived bonds —
  * plus `diyFor` (the slot's base id: the record is a 自选 piece), `charId` (the operator) and, for a prototype pick,
  * `diyProto: true` (no potential, no 练度: shared/potential.js cultivationOf). Null when the pick is not legal for the
@@ -214,8 +217,15 @@ export function diyRecordOf(slot, pick, data, { potential = null } = {}) {
   const unit = backups?.units?.[charId] ?? null;
   const proto = isPrototypePick(data, slot.tier, charId);
   const form = unitForm(backups, charId, slot.status);
+  const op = diyOf(data)?.operators?.[charId] ?? null;
+  // a 自选 piece carries no 特质 by default; the two hand-designed picks get the operator's own record for this form
+  // (data/backups.json diy.operators[id].garrisons, built from tools/build-data.mjs DIY_GARRISON_IDS)
+  const elite = (slot.status?.equipLevel ?? 0) > 0;
   const rec = composeUnitRecord(slot, unit, proto ? form : atPotential(form, potential),
-    { skillIndex, moduleId: uniEquipId, bonds: diyOf(data)?.operators?.[charId]?.bonds ?? null });
+    {
+      skillIndex, moduleId: uniEquipId, bonds: op?.bonds ?? null,
+      garrisonIds: op?.garrisons?.[elite ? 'elite' : 'normal'] ?? null,
+    });
   if (!rec || !rec.skill) return null;
   rec.diyFor = slot.baseId ?? slot.chessId;
   if (proto) rec.diyProto = true;

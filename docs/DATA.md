@@ -299,7 +299,9 @@ full-rank build from the others; the build fails unless `atRank` rebuilds every 
 | `members[]`, `visibleMembers[]` | `["chess_char_1_06_a",…]` | base (normal) chessIds incl. hidden / only visible |
 | `spec` | `{"tiers":[{"need":"…","effect":"…"}],"formulas":{…},"layerGain":"…",…}` | research 02 implementer spec (null without research) |
 
-## 4. `garrisons.json` — `{ [garrisonId]: Garrison }` (249; 43 distinct `effectKey`s)
+## 4. `garrisons.json` — `{ [garrisonId]: Garrison }` (253; 43 distinct `effectKey`s; 4 of them are this fork's
+hand-designed 自选 特质 — `garrison_900_a/b` for 结城理 and `garrison_901_a/b` for 丰川祥子, tools/build-data.mjs
+`DIY_GARRISON_IDS`, `owners: []` since `diy.operators[id].garrisons` carries them instead of a chess record)
 
 | Field | Example | Meaning |
 |---|---|---|
@@ -708,7 +710,9 @@ A 自选 piece is composed by `shared/diy.js`:
 slot's tier; a prototype takes its `diy.locked` selection, another skill is refused; an owned pick names one of its three
 skills and optionally a module of its elite form at the slot's stage), `diySlot(id, data)` names a slot's tier, elite
 twin and `shopLevel`, `diyRecord(slotId, pick, { elite, data })` /
-`diyRecordOf(slot, pick, data)` give the record — the slot's identity (tier, price, merge, status; no 特质), the pick's
+`diyRecordOf(slot, pick, data)` give the record — the slot's identity (tier, price, merge, status; no 特质 by default —
+`diy.operators[id].garrisons` gives the two hand-designed picks of tools/build-data.mjs `DIY_GARRISON_IDS` their own
+record for the form, and only them), the pick's
 derived bonds, the operator's form at the slot's status with that skill and module (active on the elite only), plus
 `diyFor` = the slot's base id —, `diyPool(tier, { data, kitted })` the legal picks of a tier (prototypes, then the owned
 pool; with `kitted`, only operators with a kit: server/sim/content/kits/index.js `KITTED_CHARS`) and

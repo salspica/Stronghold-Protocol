@@ -51,16 +51,18 @@ const byNatural = (a, b) => String(a).localeCompare(String(b), 'en', { numeric: 
  * @param {object} identity the data/chess.json record whose identity the unit takes (IDENTITY_FIELDS)
  * @param {object} unit backups.units[charId]
  * @param {object} form backups.units[charId].forms[statusKey(identity.status)]
- * @param {{ skillIndex?: number, moduleId?: string|null, standInFor?: string|null, bonds?: string[]|null }} [sel]
- *   `bonds` replaces the identity's (a DIY slot's are empty: the pick's derived bonds); `standInFor` = the replaced
+ * @param {{ skillIndex?: number, moduleId?: string|null, standInFor?: string|null, bonds?: string[]|null, garrisonIds?: string[]|null }} [sel]
+ *   `bonds` / `garrisonIds` replace the identity's (a DIY slot's are empty: the pick's derived bonds and, for the two
+ *   hand-designed picks, the operator's own 特质 record of this form); `standInFor` = the replaced
  *   operator's charId (the official 补位 mark on the avatar)
  * @returns {object|null} null when a part is missing
  */
-export function composeUnitRecord(identity, unit, form, { skillIndex, moduleId = null, standInFor = null, bonds = null } = {}) {
+export function composeUnitRecord(identity, unit, form, { skillIndex, moduleId = null, standInFor = null, bonds = null, garrisonIds = null } = {}) {
   if (!identity || typeof identity !== 'object' || !unit || !form) return null;
   const out = {};
   for (const k of IDENTITY_FIELDS) if (Object.prototype.hasOwnProperty.call(identity, k)) out[k] = identity[k];
   if (Array.isArray(bonds)) out.bonds = [...bonds];
+  if (Array.isArray(garrisonIds)) out.garrisonIds = [...garrisonIds];
   const equipLevel = identity.status?.equipLevel || 0;
   const skills = Array.isArray(form.skills) ? form.skills : [];
   const skill = skills.find((s) => s && s.index === skillIndex) ?? null;

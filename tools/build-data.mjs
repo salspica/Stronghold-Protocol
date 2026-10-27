@@ -548,16 +548,59 @@ const DIY_EXCLUDED_TEAMS = Object.freeze(['rainbow', 'action4', 'mujica', 'sees'
  */
 const DIY_INCLUDED_CHARS = Object.freeze(['char_4182_oblvns', 'char_4217_makoto']);
 /**
- * Hand-designed bond sets for those two picks (the owner's decision of 2026-10-27): a deliberate deviation from the
- * "a 自选 piece's bonds come from its factions" rule. Their 奥术 / 不屈 / 远见 / 奇迹 bonds are add-on bonds whose
- * `powerIdList` is empty, so no derivation could ever reach them; the owner picked the combination instead.
- *   丰川祥子: 协防干员 + 奥术 + 不屈     (emptyShip + arcaneShip + indomShip)
+ * Hand-designed bond sets for those two picks (the owner's decisions of 2026-10-27 and 2026-10-27 evening): a
+ * deliberate deviation from the "a 自选 piece's bonds come from its factions" rule. Their 奥术 / 迅捷 / 远见 / 奇迹
+ * bonds are add-on bonds whose `powerIdList` is empty, so no derivation could ever reach them; the owner picked the
+ * combination instead.
+ *   丰川祥子: 叙拉古 + 迅捷 + 奥术     (siracusaShip + swiftShip + arcaneShip)
  *   结城理:   拉特兰 + 远见 + 奇迹     (lateranoShip + visiShip + miraShip)
  */
 const DIY_BOND_OVERRIDES = Object.freeze({
-  char_4182_oblvns: Object.freeze(['emptyShip', 'arcaneShip', 'indomShip']),
+  char_4182_oblvns: Object.freeze(['siracusaShip', 'swiftShip', 'arcaneShip']),
   char_4217_makoto: Object.freeze(['lateranoShip', 'visiShip', 'miraShip']),
 });
+/**
+ * 卫戍特质 (garrisons) of those two picks (the owner's decision of 2026-10-27 evening). A 自选 piece carries none
+ * (PRTS: 甄选加入的干员不会拥有任何特质); these two get one each, modelled on the official record whose trigger it
+ * copies, with one record per form so the elite pick gets the higher amount:
+ *   结城理 — garrison_40's "自身被击倒或替身与本体进行切换时" (act1autochess_gar_event_selfdead, bond_self):
+ *     +10 (normal) / +20 (elite) to his own active bonds, once per 替身 ⇄ 本体 switch and once per knock-out.
+ *   丰川祥子 — garrison_122's "本回合每刷新过1次" (SERVER_ADD_REFRESH_CNT_MULTIPLIER_BOND_LAYER): +15 / +30 per
+ *     refresh of the round, at 休整期结束, to her own active bonds (叙拉古 / 迅捷 / 奥术).
+ * data/garrisons.json is generated: change this table, never the JSON.
+ */
+const DIY_GARRISON_IDS = Object.freeze({
+  char_4217_makoto: Object.freeze({ normal: 'garrison_900_a', elite: 'garrison_900_b' }),
+  char_4182_oblvns: Object.freeze({ normal: 'garrison_901_a', elite: 'garrison_901_b' }),
+});
+/** The four records above, in the shape buildGarrisons emits (DATA.md §4). */
+function buildDiyGarrisons() {
+  const out = {};
+  const add = (id, desc, descRaw, eventType, effectType, effectKey, battleRuneKey, bb, bbStr) => {
+    out[id] = {
+      garrisonId: id, desc, descRaw,
+      eventType, eventTypeDesc: '持续叠加', eventTypeIcon: 'icon_bond',
+      effectType, effectKey, battleRuneKey, charLevel: 0, bb, bbStr, owners: [],
+    };
+  };
+  const makoto = (id, n) => add(id,
+    `<战斗中>自身被击倒或替身与本体进行切换时，使已激活的自身盟约层数+${n}`,
+    `<战斗中>自身被击倒或替身与本体进行切换时，使已激活的自身盟约层数<@ba.vup>+${n}</>`,
+    'IN_BATTLE', 'ADD_BOND', 'act1autochess_gar_event_selfdead', 'env_gbuff_new_with_verify',
+    { bond_add_count: n },
+    { key: 'act1autochess_gar_event_selfdead', bond_type: 'bond_self', bond_add_type: 'by_count', garrison_key: id });
+  const oblvns = (id, n) => add(id,
+    `<休整期结束时>本回合每刷新过1次，使已激活的自身盟约层数+${n}`,
+    `<休整期结束时>本回合每刷新过1次，使已激活的自身盟约层数<@ba.vup>+${n}</>`,
+    'SERVER_PREP_FIN', 'SERVER_ADD_REFRESH_CNT_MULTIPLIER_BOND_LAYER', 'SERVER_ADD_REFRESH_CNT_MULTIPLIER_BOND_LAYER', null,
+    { multiplier: n },
+    { bond: 'siracusaShip,swiftShip,arcaneShip', conditionkey: 'character_target_inboard' });
+  makoto('garrison_900_a', 10);
+  makoto('garrison_900_b', 20);
+  oblvns('garrison_901_a', 15);
+  oblvns('garrison_901_b', 30);
+  return out;
+}
 /**
  * …and every 6★ of a 联动寻访, by the prefix of its character_table `displayNumber` (the collab series: MH Monster Hunter —
  * 麒麟R夜刀 MH02, 焰狐龙梓兰 MH05, whose team reserve6 names no collab —, RS Rainbow Six, AM Ave Mujica, PS Persona, DD
@@ -696,6 +739,9 @@ function buildBackups(ctx, chess) {
     operators[id] = {
       name: ch.name, rarity: rarityOf(ch), profession: ch.profession, subProfessionId: ch.subProfessionId,
       obtainable: !ch.isNotObtainable, powers, bonds: override ? [...override] : (hit.length ? hit : [fallback]),
+      ...(DIY_GARRISON_IDS[id]
+        ? { garrisons: { normal: [DIY_GARRISON_IDS[id].normal], elite: [DIY_GARRISON_IDS[id].elite] } }
+        : null),
     };
   }
   return { units, tokens, diy: { slots, prototypes, locked, ownedPool, excluded, operators } };
@@ -3265,7 +3311,7 @@ async function main() {
   const { chess, backups } = passes[FULL_RANK];
   const effects = buildEffects(ctx);
   const bonds = buildBonds(ctx, chess, effects);
-  const garrisons = buildGarrisons(ctx, chess);
+  const garrisons = { ...buildGarrisons(ctx, chess), ...buildDiyGarrisons() };
   const items = buildItems(ctx, effects);
   const bands = buildBands(ctx, effects);
   const enemies = buildEnemies(ctx);

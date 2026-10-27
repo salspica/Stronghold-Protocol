@@ -42,20 +42,33 @@ function deploy(h, ps, id) {
   return p;
 }
 
-test('the derived bonds of the data: each owned pick its core bonds or 协防, 煌 alone two, every prototype 协防 (read from the data)', REAL, () => {
+test('the derived bonds of the data: each owned pick its core bonds or 协防, 煌 and the two hand-designed picks several, every prototype 协防 (read from the data)', REAL, () => {
   const owned = DATA.backups.diy.ownedPool; // never hard-coded: the pool changes (焰狐龙梓兰 left it as a collab operator)
   const core = new Set(Object.entries(DATA.bonds).filter(([, b]) => b && b.isCore).map(([id]) => id));
+  // tools/build-data.mjs DIY_BOND_OVERRIDES: a hand-designed set (the owner's decisions of 2026-10-27); their add-on
+  // bonds have an empty powerIdList and cannot be derived
+  const HAND = {
+    char_4182_oblvns: ['siracusaShip', 'swiftShip', 'arcaneShip'],
+    char_4217_makoto: ['lateranoShip', 'visiShip', 'miraShip'],
+  };
   for (const id of owned) {
     const b = OPS[id].bonds;
     assert.ok(b.length >= 1, id);
+    if (HAND[id]) { assert.deepEqual(b, HAND[id], `${id}: hand-designed`); continue; }
     assert.ok((b.length === 1 && b[0] === 'emptyShip') || b.every((x) => core.has(x)), `${id}: ${b.join(', ')}`);
   }
   assert.deepEqual(OPS[HUANG].bonds, ['yanShip', 'victoriaShip']);
-  assert.deepEqual(owned.filter((id) => OPS[id].bonds.length > 1), [HUANG], '煌 alone has several');
+  assert.deepEqual(owned.filter((id) => OPS[id].bonds.length > 1).sort(), [HUANG, 'char_4182_oblvns', 'char_4217_makoto'].sort(), '煌 + the two hand-designed picks');
   assert.deepEqual(OPS.char_300_phenxi.bonds, ['lateranoShip']);
   assert.deepEqual(OPS.char_4098_vvana.bonds, ['kazimierzShip']);
   assert.deepEqual(OPS[CROSLY].bonds, ['siracusaShip']);
   for (const id of [...DATA.backups.diy.prototypes[5], ...DATA.backups.diy.prototypes[6]]) assert.deepEqual(OPS[id].bonds, ['emptyShip'], id);
+  // the two hand-designed picks carry one 卫戍特质 id per form (DIY_GARRISON_IDS); no other pick carries one
+  for (const [id, g] of Object.entries(OPS)) {
+    if (id === 'char_4182_oblvns') assert.deepEqual(g.garrisons, { normal: ['garrison_901_a'], elite: ['garrison_901_b'] });
+    else if (id === 'char_4217_makoto') assert.deepEqual(g.garrisons, { normal: ['garrison_900_a'], elite: ['garrison_900_b'] });
+    else assert.equal(g.garrisons, undefined, `${id}: no 特质 (PRTS 甄选加入的干员不会拥有任何特质)`);
+  }
 });
 
 test('煌 counts for 炎 and 维多利亚; its normal and elite copies count once; views and the battle input agree', REAL, () => {
@@ -122,4 +135,77 @@ test('sim: a 叙拉古 自选 piece gets 叙拉古\'s deployment buff; a 协防 
   assert.equal(scale(elite), 1.4, '协防 elite member ×1.4');
   assert.equal(scale(crosly), undefined, '弑君者 is no 协防 member');
   checkBattle(h.b);
+});
+
+// ---------------------------------------------------------------------------------------------------------------
+// the two hand-designed picks' 卫戍特质 (tools/build-data.mjs DIY_GARRISON_IDS, docs/DATA.md §18)
+
+const MAKOTO = 'char_4217_makoto';
+const OBLVNS = 'char_4182_oblvns';
+const B = (layers = 0) => ({ count: 3, active: true, tier: 1, layers });
+const layersOf = (h) => h.result().perPlayer.p1.layerGains;
+
+test('结城理 的特质: 每次切换 <替身> 或被击倒，使已激活的自身盟约 +10（精锐 +20）', REAL, () => {
+  for (const [elite, want] of [[false, 10], [true, 20]]) {
+    const h = makeBattle({
+      autoFinish: false, timeLimit: 200, seed: 3,
+      bonds: { lateranoShip: B(), visiShip: B(), miraShip: B(), yanShip: B() },
+      units: [{ uid: 1, diy: { slot: 5, charId: MAKOTO, skillIndex: 0, uniEquipId: null }, elite, row: 10, col: 5 }],
+    });
+    h.step();
+    const u = h.unit(1);
+    const own = { lateranoShip: want, visiShip: want, miraShip: want };
+    h.b.dealDamage(null, u, { amount: 1e9, type: 'true' });
+    h.step(1);
+    assert.deepEqual([u.alive, u.trait.doll], [true, true], `elite ${elite}: the <替身> took the hit`);
+    assert.deepEqual(layersOf(h), own, `elite ${elite}: body → <替身>`);
+    // knocked out as the <替身> → the second trigger (after the 1 s switch, whose 不死 absorbs hits)
+    h.run(1.2);
+    h.b.dealDamage(null, u, { amount: 1e9, type: 'true' });
+    h.step(1);
+    assert.equal(u.alive, false, `elite ${elite}: knocked out`);
+    assert.deepEqual(layersOf(h), { lateranoShip: 2 * want, visiShip: 2 * want, miraShip: 2 * want }, `elite ${elite}: + ${want} on the knock-out`);
+    // 炎 is active but not one of his bonds
+    assert.equal(layersOf(h).yanShip, undefined);
+    checkBattle(h.b);
+  }
+  // the switch back is a trigger too: a lethal hit, then the standin's expiry
+  const h = makeBattle({
+    autoFinish: false, timeLimit: 200, seed: 3,
+    bonds: { lateranoShip: B(), visiShip: B(), miraShip: B() },
+    units: [{ uid: 1, diy: { slot: 5, charId: MAKOTO, skillIndex: 0, uniEquipId: null }, elite: false, row: 10, col: 5 }],
+  });
+  h.step();
+  const u = h.unit(1);
+  h.b.dealDamage(null, u, { amount: 1e9, type: 'true' });
+  h.step(1);
+  h.run(21.5);
+  assert.deepEqual([u.alive, u.trait.doll], [true, false]);
+  assert.deepEqual(layersOf(h), { lateranoShip: 20, visiShip: 20, miraShip: 20 }, '<替身> → body');
+  checkBattle(h.b);
+});
+
+test('丰川祥子 的特质: 休整期结束时，本回合每刷新过 1 次，使已激活的自身盟约 +15（精锐 +30）', REAL, () => {
+  for (const [elite, want] of [[false, 15], [true, 30]]) {
+    const h = soloMatch();
+    const p0 = slot(h, { [T5A]: { charId: OBLVNS, skillIndex: 0 } });
+    p0.bandId = null; // isolate from the band's own prep effects
+    deploy(h, p0, elite ? T5A.replace(/_a$/, '_b') : T5A);
+    for (const b of ['siracusaShip', 'swiftShip', 'arcaneShip']) p0.bondCountBonus[b] = 20;
+    p0.recompute();
+    assert.deepEqual(['siracusaShip', 'swiftShip', 'arcaneShip'].map((b) => !!p0.bonds[b]?.active), [true, true, true], 'her three bonds are active');
+    p0.round.refreshes = 2;
+    h.m.dispatch(p0, 'onPrepEnd', { round: h.m.round });
+    for (const b of ['siracusaShip', 'swiftShip', 'arcaneShip']) assert.equal(p0.layers[b], 2 * want, `elite ${elite}: ${b} + ${2 * want}`);
+  }
+  // only for the copy on the board (character_target_inboard): in hand it does not fire
+  const h = soloMatch();
+  const p0 = slot(h, { [T5A]: { charId: OBLVNS, skillIndex: 0 } });
+  p0.bandId = null;
+  p0.acquireChess(T5A, { source: 'buy' });
+  for (const b of ['siracusaShip', 'swiftShip', 'arcaneShip']) p0.bondCountBonus[b] = 20;
+  p0.recompute();
+  p0.round.refreshes = 2;
+  h.m.dispatch(p0, 'onPrepEnd', { round: h.m.round });
+  for (const b of ['siracusaShip', 'swiftShip', 'arcaneShip']) assert.equal(p0.layers[b] || 0, 0, `${b}: only on the board`);
 });

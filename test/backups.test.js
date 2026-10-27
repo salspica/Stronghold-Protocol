@@ -24,6 +24,7 @@ const load = (name) => JSON.parse(readFileSync(join(DATA, `${name}.json`), 'utf8
 const chess = load('chess');
 const backups = load('backups');
 const bonds = load('bonds');
+const garrisons = load('garrisons');
 const config = load('config');
 const raw = (f) => JSON.parse(readFileSync(join(CACHE, 'excel', `${f}.json`), 'utf8'));
 
@@ -321,15 +322,20 @@ test('DIY: the owned-6★ pool and the faction → bond rule (mainPower + every 
   assert.equal(core.length, 8);
   for (const [id, o] of Object.entries(operators)) {
     const hit = core.filter((b) => b.powerIdList.some((p) => o.powers.includes(p))).map((b) => b.bondId);
-    // tools/build-data.mjs DIY_BOND_OVERRIDES (the owner's decision of 2026-10-27): a hand-designed set replaces the
-    // derived one for these two; their add-on bonds have an empty powerIdList and cannot be derived at all.
-    const hand = { char_4182_oblvns: ['emptyShip', 'arcaneShip', 'indomShip'], char_4217_makoto: ['lateranoShip', 'visiShip', 'miraShip'] }[id];
+    // tools/build-data.mjs DIY_BOND_OVERRIDES (the owner's decision of 2026-10-27, updated the same evening): a
+    // hand-designed set replaces the derived one for these two; their add-on bonds have an empty powerIdList and cannot
+    // be derived at all.
+    const hand = { char_4182_oblvns: ['siracusaShip', 'swiftShip', 'arcaneShip'], char_4217_makoto: ['lateranoShip', 'visiShip', 'miraShip'] }[id];
     assert.deepEqual(o.bonds, hand ?? (hit.length ? hit : [config.economy.fallbackBondId]), `${id}: bonds from powers`);
+    // and their 卫戍特质 (tools/build-data.mjs DIY_GARRISON_IDS): none by default, one record per form for these two
+    const want = { char_4182_oblvns: { normal: ['garrison_901_a'], elite: ['garrison_901_b'] }, char_4217_makoto: { normal: ['garrison_900_a'], elite: ['garrison_900_b'] } }[id];
+    assert.deepEqual(o.garrisons, want ?? undefined, `${id}: garrisons`);
+    if (want) for (const gid of [...want.normal, ...want.elite]) assert.ok(garrisons[gid], `${gid}: a garrison record`);
   }
   const tally = {};
   for (const id of ownedPool) { const k = operators[id].bonds.join('+'); tally[k] = (tally[k] || 0) + 1; }
   // the two hand-designed picks (DIY_BOND_OVERRIDES) form their own keys; the rest are unchanged
-  assert.deepEqual(tally, { emptyShip: 38, yanShip: 14, victoriaShip: 8, sargonShip: 4, siracusaShip: 4, lateranoShip: 1, kazimierzShip: 1, egirShip: 1, 'yanShip+victoriaShip': 1, 'emptyShip+arcaneShip+indomShip': 1, 'lateranoShip+visiShip+miraShip': 1 });
+  assert.deepEqual(tally, { emptyShip: 38, yanShip: 14, victoriaShip: 8, sargonShip: 4, siracusaShip: 4, lateranoShip: 1, kazimierzShip: 1, egirShip: 1, 'yanShip+victoriaShip': 1, 'siracusaShip+swiftShip+arcaneShip': 1, 'lateranoShip+visiShip+miraShip': 1 });
   // the collab operators are out of the data and the pool (the owner's decision of 2026-10-05: copyright), except the
   // two this fork admits on purpose (tools/build-data.mjs DIY_INCLUDED_CHARS, the owner's decision of 2026-10-27)
   assert.deepEqual(backups.diy.excluded.map((id) => [id, backups.units[id], operators[id]]),
