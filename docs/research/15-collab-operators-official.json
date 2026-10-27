@@ -1,0 +1,220 @@
+{
+  "format": "stronghold-collab-operators-official",
+  "version": 1,
+  "written": "2026-10-27",
+  "client": "26-09-13-15-28-10-30688348",
+  "clientAbRoot": "D:/Hypergryph Launcher/games/Arknights/Arknights_Data/StreamingAssets/AB/Windows",
+  "method": {
+    "extractor": "tools/local-extract/abilities.py (UnityPy + fx.AssetEnv)",
+    "tables": [".cache/gamedata/excel/skill_table.json", ".cache/gamedata/excel/character_table.json", ".cache/gamedata/excel/uniequip_table.json", ".cache/gamedata/excel/battle_equip_table.json"],
+    "fxIndex": "public/assets/local/fx/index.json",
+    "rawDump": ".cache/collab-abilities/<charId>.json (local only, not committed)"
+  },
+  "tags": {
+    "DATA": "serialized client prefab / official data table",
+    "VERIFIED": "official description text or wiki wording",
+    "ASSUMED": "engine mapping not directly serialized"
+  },
+  "makoto": {
+    "charId": "char_4217_makoto",
+    "name": "结城理",
+    "profession": "SPECIAL",
+    "subProfessionId": "dollkeeper",
+    "modes": [
+      { "index": 0, "name": "Default" },
+      { "index": 1, "name": "Stand_S1" },
+      { "index": 2, "name": "Stand_S2" },
+      { "index": 3, "name": "Stand_S3_1" },
+      { "index": 4, "name": "Stand_S3_2" },
+      { "index": 5, "name": "Switch2Normal" }
+    ],
+    "trait": {
+      "dollDuration": 20,
+      "blockDuringDoll": 0,
+      "switchBegin": {
+        "clearsAllBuffs": true,
+        "clearSp": true,
+        "rebirthNode": "OnRallyPointLikeReborn",
+        "retainedBuffs": []
+      },
+      "switchEnd": {
+        "clearsAllBuffs": true,
+        "retainedBuffs": ["makoto_switchend", "makoto_tr", "makoto_stand[block_zero]", "makoto_standin", "makoto_talent_1", "makoto_talent_2", "makoto_skill_2", "makoto_allout_attack_allow_effect", "makoto_s3_1_forbid_turn"],
+        "rebirthNode": "OnRallyPointLikeReborn"
+      },
+      "fatal": {
+        "event": "ON_BEFORE_TRY_SET_HP_ZERO (27)",
+        "template": "makoto_tr",
+        "normalMode": "can_trans_to_stand=1",
+        "s3P1Mode": "can_trans_to_stand=1, is_trans_to_s3_2=1",
+        "undeadBuff": "makoto_tr_undead",
+        "skillBranches": {
+          "skchr_makoto_1": "makoto[switch2stand_s1]",
+          "skchr_makoto_2": "makoto[switch2stand_s2]",
+          "skchr_makoto_3": "is_trans_to_s3_2 ? makoto[switch2stand_s3_2] : makoto[switch2stand_s3_1]"
+        }
+      }
+    },
+    "talents": {
+      "t1": {
+        "name": "不羁之力",
+        "e2": { "atk": 0.8, "potential4Atk": 0.85, "base_attack_time": 0.4, "sluggish": 8, "max_hp_t1": 0.35, "range_id": "x-1" },
+        "scope": "self while in doll form",
+        "switchSlow": "CreateBuffInRange with sluggish seconds around the switch"
+      },
+      "t2": {
+        "name": "S.E.E.S.队长",
+        "e2": { "atk_scale": 4.3, "potential2AtkScale": 4.5, "multi_attack_total_cnt": 1, "final_damage_different_ratio": 1 },
+        "trigger": "doll/standin ends and the unit has makoto_talent_2",
+        "targeting": "each S.E.E.S. member's surroundings; stackable",
+        "damageType": "true (official text)"
+      }
+    },
+    "skills": {
+      "skchr_makoto_1": {
+        "name": "俄耳甫斯的竖琴",
+        "sp": { "spCost": 8, "initSp": 4, "maxChargeTime": 1, "spType": "INCREASE_WITH_TIME" },
+        "l7": { "attack@atk_scale": 2.1, "attack@heal_scale": 0.5 },
+        "targets": 1,
+        "attackType": "arts",
+        "healRule": "ally at <50% HP replaces the enemy attack; Heal selector maxHpRatio=0.5, max 1",
+        "evidence": ["charpack/char_4217_makoto.ab:Modes/Stand_S1/Body/Attack", "Selector/GroupSelector", "HealAlly_Lt50Per", "MagicAttack"]
+      },
+      "skchr_makoto_2": {
+        "name": "塔纳托斯的囚锁",
+        "sp": { "spCost": 12, "initSp": 6, "maxChargeTime": 1, "spType": "INCREASE_WITH_TIME" },
+        "l7": { "attack@max_target": 4, "attack@atk_scale": 2.2, "attack@prob": 0.35, "attack@fear": 1.5, "attack@kill_atk_scale": 2.5, "attack@kill_damage": 9999999 },
+        "targets": { "l1": 3, "l7": 4, "l10": 4 },
+        "directAttack": { "atkScale": 0, "damageType": "arts", "preDelay": 0.8, "note": "damage is applied by makoto_s2_fear_damage, not by the melee hit" },
+        "fear": { "chance": 0.35, "duration": 1.5, "template": "makoto_s2_fear_possibility" },
+        "execute": { "condition": "target has fear and current HP < kill_atk_scale * ATK", "damage": 9999999, "damageType": "PURE", "instantKillLikeDamage": true, "auraInterval": 0.1, "template": "makoto_s2_fear_aura_inst_kill" }
+      },
+      "skchr_makoto_3": {
+        "name": "开辟明日的剑刃",
+        "sp": { "spCost": 15, "initSp": 7, "maxChargeTime": 1, "spType": "INCREASE_WITH_TIME" },
+        "l7": { "talent@attack_speed": 45, "attack@atk_scale": 2.0, "attack@heal_scale": 0.3, "attack@interval": 1, "attack@prob": 0.35, "attack@max_target": 4, "attack@max_target_heal": 4, "attack@block_cnt": 2 },
+        "p1": { "mode": "Stand_S3_1", "targets": 4, "atkScale": 2.0, "attackSpeed": 45, "damageType": "arts + common_weak_damage", "block": 0 },
+        "p2": { "mode": "Stand_S3_2", "targets": 0, "noAttack": true, "block": 2, "evade": 0.35, "healScale": 0.3, "healTargets": 4, "healInterval": "1 s (official text)" },
+        "p1toP2": { "trigger": "second skill activation or fatal damage while in Stand_S3_1", "template": "makoto_s3_trigger", "duration": "remaining of the same 20 s standin, not refreshed", "pause": "no separate duration node" },
+        "allOutAttack": "T2, not S3: makoto_allout_attack_damage / makoto[switch2normal_allout]"
+      }
+    },
+    "modules": {
+      "uniequip_002_makoto": {
+        "trait": { "duration": 20, "max_hp": 0.2 },
+        "flat": { "l1": { "max_hp": 200, "atk": 18, "def": 18 }, "l2": { "max_hp": 257, "atk": 27, "def": 27 }, "l3": { "max_hp": 304, "atk": 34, "def": 34 } },
+        "t1Upgrade": { "l2": { "atk": 0.88, "sluggish": 9, "max_hp_t1": 0.38 }, "l3": { "atk": 0.95, "sluggish": 10, "max_hp_t1": 0.4 } }
+      }
+    },
+    "evidence": [
+      "charpack/char_4217_makoto.ab:Character._modes (0 Default,1 Stand_S1,2 Stand_S2,3 Stand_S3_1,4 Stand_S3_2,5 Switch2Normal)",
+      "config/buff_template_holder.ab:_templates[makoto_tr, makoto_switchbegin, makoto_switchend, makoto_switchend2normal, makoto_standin, makoto_s1_trigger, makoto_s2_trigger, makoto_s3_trigger, makoto_s2_fear_*]",
+      "battle/prefabs/[uc]skills.ab:skchr_makoto_1/2/3",
+      "battle/prefabs/[uc]projectiles.ab:projectile_chr_makoto_s1",
+      ".cache/gamedata/excel/skill_table.json:skchr_makoto_*.levels[6].blackboard",
+      ".cache/gamedata/excel/character_table.json:char_4217_makoto.talents"
+    ]
+  },
+  "oblvns": {
+    "charId": "char_4182_oblvns",
+    "name": "丰川祥子",
+    "profession": "WARRIOR",
+    "subProfessionId": "lord",
+    "modes": [
+      { "index": 0, "name": "Default" },
+      { "index": 1, "name": "S2_AttackSpeed" },
+      { "index": 2, "name": "S2_Atk" },
+      { "index": 3, "name": "S2_Fever" },
+      { "index": 4, "name": "S3" },
+      { "index": 5, "name": "S2_Fever_Mag" }
+    ],
+    "talents": {
+      "t1": {
+        "name": "颂乐音符",
+        "e2": { "delay": 1, "def_penetrate_ratio": 0.03, "magic_resist_penetrate_ratio": 0.02, "attack@angle": 20, "max_cnt": 10 },
+        "noteCount": "global cnt, one per live note; projectile spawn +1, hit/stop -1",
+        "penetration": "cur_cnt = min(cnt, max_cnt); def_penetrate = cur_cnt * def_penetrate_ratio; magic_resist_penetrate = cur_cnt * magic_resist_penetrate_ratio",
+        "scope": "all units with the mujica tag (FilterGroupTagTargetValidator _tags:[mujica])",
+        "evidence": ["GlobalAuraAbility oblvns_t_1", "oblvns_t_1 template ON_BUFF_TRIGGER", "oblvns_t_1[attr] events 14/40", "projectile ProjectileActionBehaviour AddBuffBlackboard cnt"]
+      },
+      "t2": {
+        "name": "毋畏遗忘",
+        "e2": { "enable": 1, "attack_speed": 16, "cnt": 3 },
+        "fever": 3,
+        "rangeExtension": "SharedCharacterRangeBehaviour + ComposedRangeTalent: union with other mujica members' original ranges when they overlap",
+        "feverInThisMode": "ignored (no Fever resource)"
+      }
+    },
+    "skills": {
+      "skchr_oblvns_1": {
+        "name": "新月的苏醒",
+        "sp": { "spCost": 4, "initSp": 0, "maxChargeTime": 2, "spType": "INCREASE_WHEN_ATTACK" },
+        "notes": 8,
+        "interval": 0.1,
+        "independentTargets": true,
+        "noTarget": "fires at the input tile (_allowNoTarget=1, _emitToInputPosWhenTargetIsInvalid=1)",
+        "scalesL7": [0.8, 0.73, 0.6, 0.47, 0.33, 0.27, 0.13, 0.04],
+        "autoRelease": "at 2 charges (maxChargeTime=2); oblvns_s_1[self] checks SP ratio and casts; Fever branch ignored",
+        "evidence": ["battle/prefabs/[uc]skills.ab:skchr_oblvns_1", "MultiRangedAttack._additionalTimes=7, _triggerDelta=0.1, _additionalProjectiles=projectile_chr_oblvns_s1_1..8", "skill_table blackboard atk_scale..atk_scale_8"]
+      },
+      "skchr_oblvns_2": {
+        "name": "满月的舞会",
+        "sp": { "spCost": 5, "initSp": 0, "maxChargeTime": 1, "spType": "INCREASE_WHEN_ATTACK" },
+        "toggle": { "initial": "piano (mode 2 S2_Atk)", "other": "organ (mode 1 S2_AttackSpeed)", "mechanism": "ToggleSkillWithEndAnimation _defaultModeIndex=2, _switchToMode=1; oblvns_s_2[switch] switches 1<->2 on toggle", "duration": "infinite toggle; no auto end" },
+        "piano": { "atk": 0.75, "attack_speed": 0, "damageType": "physical", "projectile": "projectile_chr_oblvns_s2", "speed": 3.5, "passThrough": true, "stopAfterFirstHit": 0, "passbyDelay": 0.5 },
+        "organ": { "atk": 0, "attack_speed": 110, "damageType": "arts", "projectile": "projectile_chr_oblvns_s2_slow", "speed": 1.0, "passThrough": false, "stopAfterFirstHit": 1 },
+        "l7": { "attack@atk": 0.75, "attack@attack_speed": 110, "attack@passby_delay": 0.5 },
+        "affects": "only while S2 is the active mode; S1/S3 have their own projectile types"
+      },
+      "skchr_oblvns_3": {
+        "name": "残月的余响",
+        "sp": { "spCost": 46, "initSp": 30, "maxChargeTime": 1, "spType": "INCREASE_WHEN_ATTACK" },
+        "duration": 25,
+        "rangeId": "3-21",
+        "l7": { "attack@atk_scale": 1.8, "attack@attack_speed": 0 },
+        "notes": { "physical": 2, "magic": 2, "physicalProjectile": "projectile_chr_oblvns_s3_phy", "magicProjectile": "projectile_chr_oblvns_s3_mag", "intervals": [0.1, 0.05] },
+        "targeting": { "physicalPostFilter": 68, "magicPostFilter": 8, "official": "physical tracks highest DEF, magic tracks highest RES", "status": "ASSUMED (no explicit sort field; postFilter differs)" },
+        "p1p2": "NOT PRESENT: only one UnitMode S3; no S3 P1/P2 nodes in the client; P1/P2 describe makoto's S3",
+        "fever": "FeverCommonBehaviour/_feverKey env_033_fever present but this mode has no Fever resource; ignore"
+      }
+    },
+    "projectiles": {
+      "projectile_chr_oblvns": { "speeds": [2.0, 2.0, 0.1, 0.1], "switchToTrace": 0.1, "life": 10, "stopAfterFirstHit": true, "maxHit": 1, "damageType": "physical", "passThrough": false },
+      "projectile_chr_oblvns_talent": { "speeds": [2.0, 1.3, 0.1], "switchToTrace": 0.1, "life": 10, "stopAfterFirstHit": true, "maxHit": 1, "damageType": "physical", "passThrough": false },
+      "projectile_chr_oblvns_s1_1..8": { "speeds": [2.2, 1.7, 0.1], "switchToTrace": 0.6, "life": 10, "stopAfterFirstHit": true, "maxHit": 1, "damageType": "arts", "passThrough": false },
+      "projectile_chr_oblvns_s2": { "speeds": [3.5, 1.9, 3.0, 0.1], "switchToTrace": 0.4, "life": 10, "stopAfterFirstHit": false, "stopAfterMaxHit": true, "maxHit": 1, "hitNumType": 2, "damageType": "physical", "passbyDelay": 0.5 },
+      "projectile_chr_oblvns_s2_slow": { "speeds": [1.0, 0.7, 0.1], "switchToTrace": 0.4, "life": 10, "stopAfterFirstHit": true, "maxHit": 1, "damageType": "arts" },
+      "projectile_chr_oblvns_s3_phy": { "speeds": [1.3, 0.8, 0.1], "switchToTrace": 0.8, "life": 10, "stopAfterFirstHit": true, "maxHit": 1, "damageType": "physical" },
+      "projectile_chr_oblvns_s3_mag": { "speeds": [1.3, 0.8, 0.1], "switchToTrace": 0.8, "life": 10, "stopAfterFirstHit": true, "maxHit": 1, "damageType": "arts" }
+    },
+    "modules": {
+      "uniequip_002_oblvns": {
+        "trait": { "attack_speed": 12, "atk_scale": 0.8, "condition": "2+ enemies in range" },
+        "flat": { "l1": { "max_hp": 180, "atk": 38, "attack_speed": 5 }, "l2": { "max_hp": 250, "atk": 54, "attack_speed": 6 }, "l3": { "max_hp": 300, "atk": 63, "attack_speed": 7 } },
+        "t1Upgrade": { "l2": { "def_penetrate_ratio": 0.04, "magic_resist_penetrate_ratio": 0.02, "max_cnt": 12 }, "l3": { "def_penetrate_ratio": 0.05, "magic_resist_penetrate_ratio": 0.025, "max_cnt": 12 } }
+      }
+    },
+    "evidence": [
+      "charpack/char_4182_oblvns.ab:Character._modes (0 Default,1 S2_AttackSpeed,2 S2_Atk,3 S2_Fever,4 S3,5 S2_Fever_Mag)",
+      "config/buff_template_holder.ab:_templates[oblvns_t_1, oblvns_t_1[attr], oblvns_t_2*, oblvns_s_1*, oblvns_s_2*, oblvns_s_3*]",
+      "battle/prefabs/[uc]skills.ab:skchr_oblvns_1/2/3",
+      "battle/prefabs/[uc]projectiles.ab:projectile_chr_oblvns*",
+      ".cache/gamedata/excel/skill_table.json:skchr_oblvns_*.levels[6].blackboard",
+      ".cache/gamedata/excel/character_table.json:char_4182_oblvns.talents"
+    ]
+  },
+  "gaps": [
+    { "operator": "makoto", "official": "S1/S2/S3 each switch to a different doll mode; S3 P1 Thanatos -> P2 Orpheus", "now": "task-described placeholder personaCast/personaHit/personaFear; no kit in this checkout", "engine": "unit.form/mode, battle.on('fatal'/'dollSwitch'), addBuff, emit, fx", "risk": "generic installDollkeeper has one doll form" },
+    { "operator": "makoto", "official": "S1 heals an ally <50% instead of attacking", "now": "personaCast/personaHit placeholder", "engine": "attack target selection + heal branch (attack.heal/hpAtMost)", "risk": "replacing damage per attack" },
+    { "operator": "makoto", "official": "S2 fear 35%/1.5 s, 4 targets, execute <2.5x ATK for 9,999,999 pure, aura every 0.1 s", "now": "personaFear placeholder", "engine": "applyStatus fear, every(0.1), dealDamage pure/instant", "risk": "boss 300k cap; status model" },
+    { "operator": "makoto", "official": "S3 P2 support: block 2, 35% dodge, 30% ATK/s heal to 4, no attack", "now": "personaCast placeholder", "engine": "mods block, addBuff evade, every(1) heal, unit.form", "risk": "doll form duration/HP reset" },
+    { "operator": "makoto", "official": "T1 ATK +65%, interval +40%, HP +35%, 8 s slow on switch", "now": "unknown/missing", "engine": "mods atk/bat/hp, addBuff slow aura", "risk": "module values" },
+    { "operator": "makoto", "official": "T2 all-out attack around each S.E.E.S. member on doll end, 450% true damage, stackable", "now": "unknown/missing", "engine": "group('sees'), addBuff, dealDamage true, on doll end", "risk": "stacking/source ATK" },
+    { "operator": "oblvns", "official": "T1 live-note count grants 3%/2% DEF/RES penetration to all mujica, max 10 (12 module)", "now": "PROJ.note placeholder", "engine": "projectile count tracking, aura buff per group", "risk": "allies vs only attacker" },
+    { "operator": "oblvns", "official": "S1 8 notes at 0.1 s, independent targets, 0.8..0.04 scales, auto at 2 charges", "now": "single note placeholder", "engine": "every(0.1), addProjectile x8, per-note scale", "risk": "target re-selection/auto cast" },
+    { "operator": "oblvns", "official": "S2 toggle piano/organ, physical pass-through vs slow arts, +75% ATK vs +110 ASPD", "now": "PROJ.note single visual", "engine": "kind:'toggle', mode-specific mods/attack/projectile", "risk": "toggle state and projectile switch" },
+    { "operator": "oblvns", "official": "S3 2 physical + 2 arts notes, 3-21, highest DEF/RES, 25 s, no P1/P2", "now": "notes.js note", "engine": "targeting priority highDef/highRes, 2 projectiles per type, rangeGrid", "risk": "priority enum mapping" },
+    { "operator": "oblvns", "official": "notes expire after leaving range (delay 1) and have 10 s life; piano passes through", "now": "PROJ.note may over/under live", "engine": "projectile lifetime/exit-range kill, pass-through flags", "risk": "no exact exit timer field" },
+    { "operator": "oblvns", "official": "T2 ASPD +16 and range union; Fever +3", "now": "unknown/missing", "engine": "aura mods, range union, Fever omitted", "risk": "no Fever resource; range union" }
+  ]
+}
