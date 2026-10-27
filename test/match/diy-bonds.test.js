@@ -8,8 +8,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { KITTED_CHARS } from '../../server/sim/content/kits/index.js';
 import { hasGeneratedData } from '../../server/sim/simdata.js';
-import { makeBattle, checkInvariants as checkBattle } from '../helpers/battleHarness.js';
-import { DATA, makeMatch, legalTileFor } from './harness.js';
+import { makeBattle, checkInvariants as checkBattle, enemyRec } from '../helpers/battleHarness.js';
+import { DATA, makeMatch, legalTileFor, giveItem } from './harness.js';
 
 const REAL = { skip: !hasGeneratedData() };
 const T5A = 'chess_char_5_diy1_a';
@@ -42,7 +42,7 @@ function deploy(h, ps, id) {
   return p;
 }
 
-test('the derived bonds of the data: each owned pick its core bonds or 协防, 煌 and the two hand-designed picks several, every prototype 协防 (read from the data)', REAL, () => {
+test('the derived bonds of the data: each owned pick its core bonds or 协防, 煌 and the three hand-designed picks several, every prototype 协防 (read from the data)', REAL, () => {
   const owned = DATA.backups.diy.ownedPool; // never hard-coded: the pool changes (焰狐龙梓兰 left it as a collab operator)
   const core = new Set(Object.entries(DATA.bonds).filter(([, b]) => b && b.isCore).map(([id]) => id));
   // tools/build-data.mjs DIY_BOND_OVERRIDES: a hand-designed set (the owner's decisions of 2026-10-27); their add-on
@@ -50,6 +50,7 @@ test('the derived bonds of the data: each owned pick its core bonds or 协防, �
   const HAND = {
     char_4182_oblvns: ['siracusaShip', 'swiftShip', 'arcaneShip'],
     char_4217_makoto: ['lateranoShip', 'visiShip', 'miraShip'],
+    char_4231_clemnt: ['egirShip', 'swiftShip', 'indomShip'],
   };
   for (const id of owned) {
     const b = OPS[id].bonds;
@@ -58,15 +59,16 @@ test('the derived bonds of the data: each owned pick its core bonds or 协防, �
     assert.ok((b.length === 1 && b[0] === 'emptyShip') || b.every((x) => core.has(x)), `${id}: ${b.join(', ')}`);
   }
   assert.deepEqual(OPS[HUANG].bonds, ['yanShip', 'victoriaShip']);
-  assert.deepEqual(owned.filter((id) => OPS[id].bonds.length > 1).sort(), [HUANG, 'char_4182_oblvns', 'char_4217_makoto'].sort(), '煌 + the two hand-designed picks');
+  assert.deepEqual(owned.filter((id) => OPS[id].bonds.length > 1).sort(), [HUANG, 'char_4182_oblvns', 'char_4217_makoto', 'char_4231_clemnt'].sort(), '煌 + the three hand-designed picks');
   assert.deepEqual(OPS.char_300_phenxi.bonds, ['lateranoShip']);
   assert.deepEqual(OPS.char_4098_vvana.bonds, ['kazimierzShip']);
   assert.deepEqual(OPS[CROSLY].bonds, ['siracusaShip']);
   for (const id of [...DATA.backups.diy.prototypes[5], ...DATA.backups.diy.prototypes[6]]) assert.deepEqual(OPS[id].bonds, ['emptyShip'], id);
-  // the two hand-designed picks carry one 卫戍特质 id per form (DIY_GARRISON_IDS); no other pick carries one
+  // the three hand-designed picks carry one 卫戍特质 id per form (DIY_GARRISON_IDS); no other pick carries one
   for (const [id, g] of Object.entries(OPS)) {
     if (id === 'char_4182_oblvns') assert.deepEqual(g.garrisons, { normal: ['garrison_901_a'], elite: ['garrison_901_b'] });
     else if (id === 'char_4217_makoto') assert.deepEqual(g.garrisons, { normal: ['garrison_900_a'], elite: ['garrison_900_b'] });
+    else if (id === 'char_4231_clemnt') assert.deepEqual(g.garrisons, { normal: ['garrison_902_a'], elite: ['garrison_902_b'] });
     else assert.equal(g.garrisons, undefined, `${id}: no 特质 (PRTS 甄选加入的干员不会拥有任何特质)`);
   }
 });
@@ -208,4 +210,60 @@ test('丰川祥子 的特质: 休整期结束时，本回合每刷新过 1 次�
   p0.round.refreshes = 2;
   h.m.dispatch(p0, 'onPrepEnd', { round: h.m.round });
   for (const b of ['siracusaShip', 'swiftShip', 'arcaneShip']) assert.equal(p0.layers[b] || 0, 0, `${b}: only on the board`);
+});
+
+test('克莱门莎 的特质: 每击杀 1 名敌人，阿戈尔 +10、迅捷 +5、不屈 +5（精锐翻倍）', REAL, () => {
+  for (const [elite, want] of [[false, { egirShip: 10, swiftShip: 5, indomShip: 5 }], [true, { egirShip: 20, swiftShip: 10, indomShip: 10 }]]) {
+    const h = makeBattle({
+      autoFinish: false, timeLimit: 200, seed: 3,
+      defs: { enemies: { e1: enemyRec({ key: 'e1', hp: 100, speed: 0, mass: 0 }) } },
+      bonds: { egirShip: B(), swiftShip: B(), indomShip: B(), yanShip: B() },
+      units: [{ uid: 1, diy: { slot: 5, charId: 'char_4231_clemnt', skillIndex: 0, uniEquipId: null }, elite, row: 10, col: 5 }],
+    });
+    h.step();
+    const u = h.unit(1);
+    const e = h.spawn('e1', { pos: [10, 6] });
+    h.b.dealDamage(u, e, { amount: 1e9, type: 'true' });
+    h.step(1);
+    assert.equal(e.alive, false, `elite ${elite}: the enemy is killed`);
+    assert.deepEqual(h.result().perPlayer.p1.layerGains, want, `elite ${elite}`);
+    // 炎 is active but not one of hers
+    assert.equal(h.result().perPlayer.p1.layerGains.yanShip, undefined);
+    checkBattle(h.b);
+  }
+});
+
+test('结城理 的特质 counts a 变形同构体-granted bond (自身盟约 is read at runtime, not a fixed list)', REAL, () => {
+  const h = makeBattle({
+    autoFinish: false, timeLimit: 200, seed: 3,
+    bonds: { lateranoShip: B(), visiShip: B(), miraShip: B(), yanShip: B() },
+    units: [{
+      uid: 1, diy: { slot: 5, charId: MAKOTO, skillIndex: 0, uniEquipId: null }, elite: false, row: 10, col: 5,
+      items: ['chess_item_6_09_e_a', 'chess_item_3_04_e_a'], // 变形同构体 + 炎国短刀 → 视为【炎】成员
+    }],
+  });
+  h.step();
+  const u = h.unit(1);
+  assert.ok(u.def.bonds.includes('lateranoShip'));
+  h.b.dealDamage(null, u, { amount: 1e9, type: 'true' });
+  h.step(1);
+  assert.deepEqual(h.result().perPlayer.p1.layerGains, { lateranoShip: 10, visiShip: 10, miraShip: 10, yanShip: 10 }, '炎 gains too');
+  checkBattle(h.b);
+});
+
+test('丰川祥子 的特质 reads 自身盟约 at runtime: a 变形同构体-granted bond gains at 休整期结束 too', REAL, () => {
+  const h = soloMatch();
+  const p0 = slot(h, { [T5A]: { charId: OBLVNS, skillIndex: 0 } });
+  p0.bandId = null;
+  const p = deploy(h, p0, T5A);
+  for (const id of ['chess_item_6_09_e_a', 'chess_item_4_08_e_b']) { // 变形同构体 + 拉特兰桥夹 → 视为【拉特兰】成员
+    const it = giveItem(h.m, p0, id);
+    assert.deepEqual(h.m.handle('p_0', { t: 'g.equip', itemUid: it.uid, targetUid: p.uid }), { ok: true });
+  }
+  for (const b of ['siracusaShip', 'swiftShip', 'arcaneShip', 'lateranoShip']) p0.bondCountBonus[b] = 20;
+  p0.recompute();
+  assert.deepEqual(['siracusaShip', 'swiftShip', 'arcaneShip', 'lateranoShip'].map((b) => !!p0.bonds[b]?.active), [true, true, true, true], 'all four are active');
+  p0.round.refreshes = 2;
+  h.m.dispatch(p0, 'onPrepEnd', { round: h.m.round });
+  for (const b of ['siracusaShip', 'swiftShip', 'arcaneShip', 'lateranoShip']) assert.equal(p0.layers[b], 30, `${b}: +30 (15 × 2)`);
 });

@@ -112,9 +112,18 @@ test('selfkillenemy (送葬人 / 休谟斯 / 斯卡蒂 / 海霓 / 伺夜 / 风�
     const h = battle({ units: [{ id: 'op', g: [gid], row: 10, col: 4, bonds: sc.unitBonds }], bonds: sc.bonds, enemies: [{ key: 'e_dummy', pos: [9, 9] }] });
     const e = h.enemies()[0];
     const per = num(g.bb.bond_add_count), every = Math.max(1, num(g.bb.check_cnt, 1));
+    // a per-bond amount (克莱门莎: 阿戈尔 +10 / 迅捷 +5 / 不屈 +5) overrides the uniform bb.bond_add_count
+    const perById = g.bbStr.bond_add_by_id
+      ? new Map(g.bbStr.bond_add_by_id.split(',').map((s) => { const [b, v] = s.split(':'); return [b.trim(), num(v)]; }))
+      : null;
     for (let k = 1; k <= 12; k++) {
       h.b.emit('kill', { killer: h.unit('op'), victim: e });
-      expectAll(h, sc.targets, Math.min(Math.floor(k / every) * per, capOf(gid)), `${gid} after ${k} kills`);
+      const want = {};
+      for (const b of sc.targets) {
+        const n = perById ? (perById.get(b) ?? 0) : Math.min(Math.floor(k / every) * per, capOf(gid));
+        if (n > 0) want[b] = n;
+      }
+      assert.deepEqual(gains(h), want, `${gid} after ${k} kills`);
     }
     cover(gid);
   }

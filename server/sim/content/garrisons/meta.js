@@ -194,10 +194,13 @@ H.SERVER_ADD_BOND_ROUND_COIN_COST = {
 
 H.SERVER_ADD_REFRESH_CNT_MULTIPLIER_BOND_LAYER = {
   run(ctx) {
-    const { bb, bbStr, garrison } = ctx.source;
+    const { bb, bbStr, garrison, piece } = ctx.source;
     let n = (ctx.roundStats().refreshes | 0) * num(bb.multiplier);
     if (num(bb.max_layer, 0) > 0) n = Math.min(n, num(bb.max_layer));
-    addAll(ctx, ids(bbStr.bond), n, requireActiveOf(garrison));
+    // 自身盟约 (a hand-designed pick): the piece's bonds as the match counts them, 变形同构体's grant included — never a
+    // fixed list. Every other record names its bonds in bbStr.bond.
+    const list = bbStr.bond_type === 'bond_self' ? metaBonds(ctx, piece) : ids(bbStr.bond);
+    addAll(ctx, list, n, requireActiveOf(garrison));
   },
 };
 

@@ -18,7 +18,9 @@
 //                       (engine statusApplied ctx.entered) — except a pulse that re-applies its own short status as a
 //                       fresh one (applyStatus `reenter`: 缇缇 S2's sleep ward, DESIGN §24.8).
 //                       Targets: bond_by_id / bond_self (own active bonds) / bond_actived_maxstack;
-//                       amounts: by_count / by_charcount_samerow / by_charlevel; conditions character_same_row /
+//                       amounts: by_count / by_charcount_samerow / by_charlevel, or a per-bond `bbStr.bond_add_by_id`
+//                       ("egirShip:10,swiftShip:5,…" — 克莱门莎's one kill granting different layers per bond); conditions
+//                       character_same_row /
 //                       character_same_col (≥ check_count incl. self). Gains go through support.gainLayers with
 //                       reason 'garrison', source = the trait's owner, cap = max_add_count_per_battle per (instance, bond)
 //                       — per instance for bond_actived_maxstack (塑心: the highest bond may change, the cap does not).
@@ -172,6 +174,20 @@ function amountOf(battle, it) {
   }
 }
 
+/** `bbStr.bond_add_by_id` ("egirShip:10,swiftShip:5,…") — a gain amount per bond for one instance, or null. 克莱门莎's
+ * "每击杀1名敌人…阿戈尔+10、迅捷+5、不屈+5" needs different amounts on one trigger; every other record keeps `amountOf`. */
+function amountsById(it) {
+  const s = it.bbStr.bond_add_by_id;
+  if (typeof s !== 'string' || !s) return null;
+  const m = new Map();
+  for (const part of s.split(',')) {
+    const [b, v] = part.split(':');
+    const n = S.num(v, 0);
+    if (b && n > 0) m.set(b.trim(), n);
+  }
+  return m.size ? m : null;
+}
+
 function conditionMet(battle, it) {
   const ck = it.bbStr.conditionkey;
   const need = S.num(it.bb.check_count, 0);
@@ -189,6 +205,21 @@ export function fireGain(battle, it) {
   if (!conditionMet(battle, it)) return 0;
   const bonds = targetBonds(battle, it);
   if (!bonds.length) return 0;
+  const per = amountsById(it);
+  // a per-bond amount (克莱门莎): each bond gets its own gain, so the per-(instance, bond) cap applies bond by bond
+  if (per) {
+    let total = 0;
+    for (const b of bonds) {
+      const n = per.get(b);
+      if (!(n > 0)) continue;
+      total += S.gainLayers(battle, {
+        playerId: it.unit.ownerId, bonds: [b], n, requireActive: true, source: it.unit, reason: 'garrison',
+        cap: it.cap, capKey: it.capKey,
+      });
+    }
+    if (total > 0) S.fxOn(battle, 'garrison', it.unit, `gar:${it.gid}`, it.key, { n: total });
+    return total;
+  }
   let n = amountOf(battle, it);
   // bond_actived_maxstack (塑心 garrison_90 "当前已激活且层数最多的盟约层数+1（每场作战至多10层）"): the cap is the instance's
   // own over the battle, whichever bond is the highest at each gain — per (instance, bond) a change of the highest bond

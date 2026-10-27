@@ -548,32 +548,39 @@ const DIY_EXCLUDED_TEAMS = Object.freeze(['rainbow', 'action4', 'mujica', 'sees'
  */
 const DIY_INCLUDED_CHARS = Object.freeze(['char_4182_oblvns', 'char_4217_makoto']);
 /**
- * Hand-designed bond sets for those two picks (the owner's decisions of 2026-10-27 and 2026-10-27 evening): a
+ * Hand-designed bond sets for those three picks (the owner's decisions of 2026-10-27 and 2026-10-27 evening): a
  * deliberate deviation from the "a 自选 piece's bonds come from its factions" rule. Their 奥术 / 迅捷 / 远见 / 奇迹
  * bonds are add-on bonds whose `powerIdList` is empty, so no derivation could ever reach them; the owner picked the
  * combination instead.
  *   丰川祥子: 叙拉古 + 迅捷 + 奥术     (siracusaShip + swiftShip + arcaneShip)
  *   结城理:   拉特兰 + 远见 + 奇迹     (lateranoShip + visiShip + miraShip)
+ *   克莱门莎: 阿戈尔 + 迅捷 + 不屈     (egirShip + swiftShip + indomShip)
  */
 const DIY_BOND_OVERRIDES = Object.freeze({
   char_4182_oblvns: Object.freeze(['siracusaShip', 'swiftShip', 'arcaneShip']),
   char_4217_makoto: Object.freeze(['lateranoShip', 'visiShip', 'miraShip']),
+  char_4231_clemnt: Object.freeze(['egirShip', 'swiftShip', 'indomShip']),
 });
 /**
- * 卫戍特质 (garrisons) of those two picks (the owner's decision of 2026-10-27 evening). A 自选 piece carries none
- * (PRTS: 甄选加入的干员不会拥有任何特质); these two get one each, modelled on the official record whose trigger it
+ * 卫戍特质 (garrisons) of those three picks (the owner's decisions of 2026-10-27 evening). A 自选 piece carries none
+ * (PRTS: 甄选加入的干员不会拥有任何特质); these get one each, modelled on the official record whose trigger it
  * copies, with one record per form so the elite pick gets the higher amount:
  *   结城理 — garrison_40's "自身被击倒或替身与本体进行切换时" (act1autochess_gar_event_selfdead, bond_self):
  *     +10 (normal) / +20 (elite) to his own active bonds, once per 替身 ⇄ 本体 switch and once per knock-out.
  *   丰川祥子 — garrison_122's "本回合每刷新过1次" (SERVER_ADD_REFRESH_CNT_MULTIPLIER_BOND_LAYER): +15 / +30 per
- *     refresh of the round, at 休整期结束, to her own active bonds (叙拉古 / 迅捷 / 奥术).
+ *     refresh of the round, at 休整期结束, to her own active bonds.
+ *   克莱门莎 — a kill trait on act1autochess_gar_event_selfkillenemy: every kill adds +10 阿戈尔, +5 迅捷, +5 不屈
+ *     (normal) / +20 / +10 / +10 (elite) — `bond_add_by_id` gives each bond its own amount (battle.js fireGain).
+ * The 结城理 / 丰川祥子 traits name the unit's OWN bonds (bond_self), never a fixed list: 变形同构体 + a bond item
+ * (转职) adds a bond at runtime and it gains too (support.unitBonds / metaBonds include those grants).
  * data/garrisons.json is generated: change this table, never the JSON.
  */
 const DIY_GARRISON_IDS = Object.freeze({
   char_4217_makoto: Object.freeze({ normal: 'garrison_900_a', elite: 'garrison_900_b' }),
   char_4182_oblvns: Object.freeze({ normal: 'garrison_901_a', elite: 'garrison_901_b' }),
+  char_4231_clemnt: Object.freeze({ normal: 'garrison_902_a', elite: 'garrison_902_b' }),
 });
-/** The four records above, in the shape buildGarrisons emits (DATA.md §4). */
+/** The records above, in the shape buildGarrisons emits (DATA.md §4). */
 function buildDiyGarrisons() {
   const out = {};
   const add = (id, desc, descRaw, eventType, effectType, effectKey, battleRuneKey, bb, bbStr) => {
@@ -594,11 +601,23 @@ function buildDiyGarrisons() {
     `<休整期结束时>本回合每刷新过1次，使已激活的自身盟约层数<@ba.vup>+${n}</>`,
     'SERVER_PREP_FIN', 'SERVER_ADD_REFRESH_CNT_MULTIPLIER_BOND_LAYER', 'SERVER_ADD_REFRESH_CNT_MULTIPLIER_BOND_LAYER', null,
     { multiplier: n },
-    { bond: 'siracusaShip,swiftShip,arcaneShip', conditionkey: 'character_target_inboard' });
+    { bond_type: 'bond_self', conditionkey: 'character_target_inboard', garrison_key: id });
+  const clemnt = (id, egir) => {
+    const swift = Math.max(1, Math.round(egir / 2)), indom = swift;
+    return add(id,
+      `<战斗中>每击杀1名敌人时，使已激活的【阿戈尔】层数+${egir}、【迅捷】层数+${swift}、【不屈】层数+${indom}`,
+      `<战斗中>每击杀1名敌人时，使已激活的【阿戈尔】层数<@ba.vup>+${egir}</>、【迅捷】层数<@ba.vup>+${swift}</>、【不屈】层数<@ba.vup>+${indom}</>`,
+      'IN_BATTLE', 'ADD_BOND', 'act1autochess_gar_event_selfkillenemy', 'env_gbuff_new_with_verify',
+      { bond_add_count: egir, check_cnt: 1 },
+      { key: 'act1autochess_gar_event_selfkillenemy', bond_type: 'bond_by_id', bond_id: 'egirShip,swiftShip,indomShip', bond_add_type: 'by_count', garrison_key: id,
+        bond_add_by_id: `egirShip:${egir},swiftShip:${swift},indomShip:${indom}` });
+  };
   makoto('garrison_900_a', 10);
   makoto('garrison_900_b', 20);
   oblvns('garrison_901_a', 15);
   oblvns('garrison_901_b', 30);
+  clemnt('garrison_902_a', 10);
+  clemnt('garrison_902_b', 20);
   return out;
 }
 /**
