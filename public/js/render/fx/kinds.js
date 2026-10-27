@@ -92,6 +92,9 @@ export const FX_KINDS = Object.freeze({
   garrison: { a: 'buff', c: 0x4ed8af }, layer: { a: 'buff', c: 0xffe066 }, sp: { a: 'sp', c: 0x6fd3ff },
   // 丰川祥子's 音符 (content/notes.js): the cast's pulse and the note's landing burst (the flight is the 'note' projectile)
   note: { a: 'wave', c: 0xff9ad5, r: 0.6 }, noteHit: { a: 'buff', c: 0xffb3e6 },
+  // 结城理's persona (content/kits/ops/op-makoto.js): his official battle prefabs are not in the local fx index, so the
+  // kit emits these [ASSUMED] placeholders — a blue cast ring, a hit spark, a violet fear mark
+  personaCast: { a: 'summon', c: 0x7fc4ff }, personaHit: { a: 'strike', c: 0xbfe2ff }, personaFear: { a: 'mark', c: 0x9f7bff },
 });
 
 /** Keyword guesses for kinds added later (checked in order), before the generic sparkle. */

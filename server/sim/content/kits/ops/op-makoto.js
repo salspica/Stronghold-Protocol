@@ -28,6 +28,18 @@ const S2 = 'skchr_makoto_2';
 const S3 = 'skchr_makoto_3';
 const bbOf = (chess, id) => skillRec(chess, id)?.bb ?? {};
 
+/**
+ * The kit's visual effects. The official battle prefabs of the AM collab operators are NOT in the local fx index
+ * (public/assets/local/fx/index.json carries 516 units / 596 skills and neither char_4217_makoto nor
+ * char_4182_oblvns), so render/vfx has nothing to draw: these procedural [ASSUMED] placeholders in the Persona's
+ * colours are what the client can show until the art pipeline has their prefabs (docs/ASSETS.md "Official battle
+ * effects"). They are sim events only — no damage, no RNG.
+ */
+const castFx = (battle, unit, persona, skill) => battle.fx('personaCast', { x: unit.x, y: unit.y, id: unit.id, persona, skill });
+const hitFx = (battle, unit, target, persona, skill) => {
+  if (target && target.alive) battle.fx('personaHit', { x: target.x, y: target.y, id: unit.id, target: target.id, persona, skill });
+};
+
 export default {
   char_4217_makoto: (bb, chess) => {
     const b1 = bbOf(chess, S1), b2 = bbOf(chess, S2), b3 = bbOf(chess, S3);
@@ -37,7 +49,13 @@ export default {
       skills: {
         // 俄耳甫斯的竖琴 — 替身 attacks for attack@atk_scale × ATK (arts). The "wounded ally instead" branch is
         // TODO(orpheus-heal): it needs a per-attack target rewrite the harness has to confirm.
-        [S1]: { kind: 'duration', mods: {}, attack: { atkScale: num(b1['attack@atk_scale'], 1) }, targeting: target(r1) },
+        [S1]: {
+          kind: 'duration',
+          mods: {},
+          attack: { atkScale: num(b1['attack@atk_scale'], 1), onHit: ({ battle, unit, target: t }) => hitFx(battle, unit, t, 'orpheus', 'makoto:s1') },
+          targeting: target(r1),
+          onStart({ battle, unit }) { castFx(battle, unit, 'orpheus', 'makoto:s1'); },
+        },
         // 塔纳托斯的囚锁 — attack@atk_scale × ATK (arts) with attack@prob to fear for attack@fear s. The execute
         // (attack@kill_damage 9 999 999 is the official "non-boss only" marker) is TODO(thanatos-execute).
         [S2]: {
@@ -46,13 +64,17 @@ export default {
           attack: {
             atkScale: num(b2['attack@atk_scale'], 1),
             onHit({ battle, unit, target: t }) {
-              if (!t || !t.alive || t.side !== 'enemy') return;
+              if (!t || !t.alive) return;
+              hitFx(battle, unit, t, 'thanatos', 'makoto:s2');
+              if (t.side !== 'enemy') return;
               if (battle.rng.chance(num(b2['attack@prob'], 0.35))) {
                 battle.applyStatus(t, 'fear', { duration: num(b2['attack@fear'], 1.5), source: unit });
+                battle.fx('personaFear', { x: t.x, y: t.y, id: unit.id, target: t.id, skill: 'makoto:s2' });
               }
             },
           },
           targeting: target(r2),
+          onStart({ battle, unit }) { castFx(battle, unit, 'thanatos', 'makoto:s2'); },
         },
         // 开辟明日的剑刃 — attack speed +talent@attack_speed, attack@atk_scale × ATK, and on activation one heal of
         // attack@heal_scale × ATK to each wounded ally (up to max_target_heal). [ASSUMED] the heal is a burst at the
@@ -60,9 +82,10 @@ export default {
         [S3]: {
           kind: 'duration',
           mods: { aspd: num(b3['talent@attack_speed'], 0) },
-          attack: { atkScale: num(b3['attack@atk_scale'], 1) },
+          attack: { atkScale: num(b3['attack@atk_scale'], 1), onHit: ({ battle, unit, target: t }) => hitFx(battle, unit, t, 'messiah', 'makoto:s3') },
           targeting: target(r3),
           onStart({ battle, unit }) {
+            castFx(battle, unit, 'messiah', 'makoto:s3');
             const cap = num(b3['attack@max_target_heal'], 4), scale = num(b3['attack@heal_scale'], 0.3);
             for (const a of battle.alliesFor(unit).filter((x) => x.alive && x.hp > 0 && x.hpRatio < 1).slice(0, cap)) {
               battle.heal(unit, a, unit.s.atk * scale, { isSkill: true });
