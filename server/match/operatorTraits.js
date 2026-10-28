@@ -18,7 +18,7 @@ export function operatorTraitLayerAllowance(player, gd) {
   for (const u of player.units ?? []) {
     if (u.kind === 'token') continue;
     const base = gd.chess(u.chessId);
-    const rec = u.standIn === true ? gd.standIn?.(u.chessId) : u.diy && base?.isDiy ? diyRecordOf(base, u.diy, gd.raw) : base;
+    const rec = u.standIn === true ? gd.standIn?.(u.chessId) : u.diy && base?.isDiy ? diyRecordOf(base, u.diy, gd.raw, { custom: u.diy.custom === true }) : base;
     if (!rec) continue;
     const ownBonds = pieceBonds({ chess: () => rec, item: id => gd.item(id), bond: id => gd.bond(id) },
       { id: u.chessId, items: (u.items ?? []).map(id => ({ id })) });

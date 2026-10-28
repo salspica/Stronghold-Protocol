@@ -273,10 +273,19 @@ function ammoScope(it, u) {
 
 const INSTALLERS = {
   act1autochess_gar_event_useskill(battle, list) {
-    const m = byUnit(list);
     battle.on('skillStart', ({ unit }) => {
-      const arr = m.get(unit);
-      if (arr) for (const it of arr) fireGain(battle, it);
+      if (!unit) return;
+      for (const it of list) {
+        // `bbStr.scope` = "bond:<bondId>": any allied member of that bond starting a skill (娜仁图亚's 萨尔贡), not
+        // only the trait's owner; the holder's own bonds then gain (bond_self in fireGain).
+        const scope = it.bbStr.scope;
+        if (scope) {
+          const bondId = scope.startsWith('bond:') ? scope.slice(5) : null;
+          if (!bondId || !S.isOp(unit) || unit.ownerId !== it.unit.ownerId || !S.onField(it.unit)) continue;
+          if (!S.unitBonds(unit).includes(bondId)) continue;
+          fireGain(battle, it);
+        } else if (unit === it.unit) fireGain(battle, it);
+      }
     });
   },
 

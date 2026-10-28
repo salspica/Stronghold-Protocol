@@ -124,7 +124,7 @@ export function defaultPick(charId, slotId, data) {
  * @param {Iterable<string>|null} kitted
  * @returns {Array<{ charId: string, unit: any, bonds: string[], proto: boolean, taken: string|null }>}
  */
-export function pickOptions(slotId, picks, data, kitted) {
+export function pickOptions(slotId, picks, data, kitted, customDiy = false) {
   const slot = diySlot(slotId, data);
   const backups = backupsOf(data);
   if (!slot || !backups) return [];
@@ -139,17 +139,19 @@ export function pickOptions(slotId, picks, data, kitted) {
       // the same tier: never twice; another tier: an owned operator only once (a prototype may repeat across tiers)
       if (tierOf(other) === slot.tier || !isPrototypePick(data, tierOf(other), charId)) { taken = other; break; }
     }
-    return { charId, unit: backups.units?.[charId] ?? null, bonds: backups.diy?.operators?.[charId]?.bonds ?? [], proto, taken };
+    const op = backups.diy?.operators?.[charId];
+    const bonds = (customDiy && op?.custom ? op.custom.bonds : op?.bonds) ?? [];
+    return { charId, unit: backups.units?.[charId] ?? null, bonds, proto, taken };
   });
 }
 
 /**
  * The record a slot shows for a pick (shared/diy.js diyRecord: the operator at the slot's normal form, or the elite).
- * @param {string} slotId @param {any} pick @param {any} data @param {{ elite?: boolean }} [opts]
+ * @param {string} slotId @param {any} pick @param {any} data @param {{ elite?: boolean, potential?: number|null, custom?: boolean }} [opts]
  */
-export function slotRecord(slotId, pick, data, { elite = false, potential = null } = {}) {
+export function slotRecord(slotId, pick, data, { elite = false, potential = null, custom = false } = {}) {
   if (!isObj(pick)) return null;
-  try { return diyRecord(slotId, pick, { elite, data, potential }); } catch { return null; }
+  try { return diyRecord(slotId, pick, { elite, data, potential, custom }); } catch { return null; }
 }
 
 /** Set (or with null, clear) one slot. Returns a new roster (the input is not changed). */

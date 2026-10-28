@@ -46,10 +46,10 @@ function Bonds({ bonds }) {
 }
 
 /** One slot: operator, class, bonds, skill/module, display skin and an owned pick's potential/cultivation. */
-function SlotCard({ m, slot, pick, illegal, onOpen, onClear, skins = {}, ops = {}, onOps = null }) {
+function SlotCard({ m, slot, pick, illegal, onOpen, onClear, skins = {}, ops = {}, onOps = null, customDiy = false }) {
   const D = diyData();
-  const rec = pick ? slotRecord(slot.slotId, pick, D) : null;
-  const elite = pick ? slotRecord(slot.slotId, pick, D, { elite: true }) : null;
+  const rec = pick ? slotRecord(slot.slotId, pick, D, { custom: customDiy }) : null;
+  const elite = pick ? slotRecord(slot.slotId, pick, D, { elite: true, custom: customDiy }) : null;
   const label = t('{tier}阶 自选', { tier: slot.tier });
   if (!rec) {
     return html`<div class=${cx('diy-slot', `diy-slot--t${slot.tier}`, 'is-empty', pick && 'is-bad')} data-slot=${slot.slotId}>
@@ -175,10 +175,10 @@ export function DiyPicker(props) {
  * The picker's view (no hooks: the tests draw it): `filter` 'all' | 'proto' | 'owned', `query`, `draft` the pick being
  * made (null = none chosen yet) and their setters.
  */
-export function DiyPickerView({ m, slot, picks, kitted, onDone, onClose, filter, query, draft, onFilter: setFilter, onQuery: setQuery, onDraft: setDraft, skins = {}, skinSync = 'idle', onSkins, ops = {}, onOps = null, previewLevel = 'elite', onPreviewLevel = () => {} }) {
+export function DiyPickerView({ m, slot, picks, kitted, onDone, onClose, filter, query, draft, onFilter: setFilter, onQuery: setQuery, onDraft: setDraft, skins = {}, skinSync = 'idle', onSkins, ops = {}, onOps = null, previewLevel = 'elite', onPreviewLevel = () => {}, customDiy = false }) {
   const D = diyData();
   const cur = picks[slot.slotId] || null;
-  const options = pickOptions(slot.slotId, picks, D, kitted);
+  const options = pickOptions(slot.slotId, picks, D, kitted, customDiy);
   const q = query.trim().toLowerCase();
   const list = options.filter((o) => (filter === 'all' || (filter === 'proto') === o.proto)
     && (!q || [o.unit?.name, o.unit?.appellation, o.unit?.subProfessionName, t(PROF_NAME[o.unit?.profession] || ''), ...o.bonds.map(bondName)].some((x) => typeof x === 'string' && x.toLowerCase().includes(q))));
@@ -193,8 +193,8 @@ export function DiyPickerView({ m, slot, picks, kitted, onDone, onClose, filter,
   const unit = draft ? D.backups?.units?.[draft.charId] : null;
   const label = t('{tier}阶 自选', { tier: slot.tier });
   const potential = ops[draft?.charId]?.potential ?? 6;
-  const base = draft ? slotRecord(slot.slotId, draft, D, { potential }) : null;
-  const golden = draft ? slotRecord(slot.slotId, draft, D, { elite: true, potential }) : null;
+  const base = draft ? slotRecord(slot.slotId, draft, D, { potential, custom: customDiy }) : null;
+  const golden = draft ? slotRecord(slot.slotId, draft, D, { elite: true, potential, custom: customDiy }) : null;
   const previewEntries = base ? { [base.baseId || base.chessId]: { skill: skillOn, module: modOn || 'none' } } : {};
   const previewChess = (id) => id === golden?.chessId ? golden : base;
   return html`<section class="diy-pick" role="dialog" aria-label=${t('{slot}：选择干员', { slot: label })} data-testid="diy-picker" data-slot=${slot.slotId}>
@@ -224,7 +224,7 @@ export function DiyPickerView({ m, slot, picks, kitted, onDone, onClose, filter,
             <span class="diy-pick__wtxt"><b>${unit.name}</b><small>${classLine(unit)}</small></span>
             <${KindTag} proto=${ch.proto} />
           </div>
-          ${onSkins ? html`<${SkinPicker} m=${m} charId=${draft.charId} record=${slotRecord(slot.slotId, draft, D, { elite: true })} choices=${skins} sync=${skinSync} onChange=${onSkins} />` : null}
+          ${onSkins ? html`<${SkinPicker} m=${m} charId=${draft.charId} record=${slotRecord(slot.slotId, draft, D, { elite: true, custom: customDiy })} choices=${skins} sync=${skinSync} onChange=${onSkins} />` : null}
           ${!ch.proto && onOps ? html`<section class="lo-sec"><header class="lo-sec__head"><h3>${t('潜能与练度')}</h3></header><${CultivationSelects} charId=${draft.charId} ops=${ops} onSet=${onOps} /></section>` : null}
           <${LoadoutStats} base=${base} golden=${golden} entries=${previewEntries} level=${previewLevel}
             onLevel=${onPreviewLevel} getChess=${previewChess} ops=${ch.proto ? null : ops} />
@@ -263,7 +263,7 @@ export function DiyPanel(props) {
 }
 
 /** The tab's view (no hooks: the tests draw it): `picking` = the slot being filled, or null. */
-export function DiyPanelView({ m, picks, legal, kitted, onSet, picking, onPicking: setPicking, skins = {}, skinSync = 'idle', onSkins, ops = {}, onOps = null }) {
+export function DiyPanelView({ m, picks, legal, kitted, onSet, picking, onPicking: setPicking, skins = {}, skinSync = 'idle', onSkins, ops = {}, onOps = null, customDiy = false }) {
   const slots = diySlotList(diyData());
   const slot = picking ? slots.find((s) => s.slotId === picking) : null;
   const tiers = [...new Set(slots.map((s) => s.tier))];
@@ -276,11 +276,11 @@ export function DiyPanelView({ m, picks, legal, kitted, onSet, picking, onPickin
         <h3 class="own-tier__head"><${TierChip} tier=${tier} size="sm" /><span class="num">${ROMAN[tier]}</span><span>${t('阶')}</span></h3>
         <div class="diy-grid">
           ${slots.filter((s) => s.tier === tier).map((s) => html`<${SlotCard} key=${s.slotId} m=${m} slot=${s} pick=${picks[s.slotId] || null}
-            skins=${skins} illegal=${!!picks[s.slotId] && !legal[s.slotId]} onOpen=${setPicking} onClear=${(id) => onSet(id, null)} ops=${ops} onOps=${onOps} />`)}
+            skins=${skins} illegal=${!!picks[s.slotId] && !legal[s.slotId]} onOpen=${setPicking} onClear=${(id) => onSet(id, null)} ops=${ops} onOps=${onOps} customDiy=${customDiy} />`)}
         </div>
       </section>`)}
     </div>
-    ${slot ? html`<${DiyPicker} m=${m} slot=${slot} picks=${picks} kitted=${kitted} skins=${skins} skinSync=${skinSync} onSkins=${onSkins} ops=${ops} onOps=${onOps} onClose=${() => setPicking(null)}
+    ${slot ? html`<${DiyPicker} m=${m} slot=${slot} picks=${picks} kitted=${kitted} skins=${skins} skinSync=${skinSync} onSkins=${onSkins} ops=${ops} onOps=${onOps} customDiy=${customDiy} onClose=${() => setPicking(null)}
       onDone=${(pick) => { onSet(slot.slotId, pick); setPicking(null); }} />` : null}
   </main>`;
 }

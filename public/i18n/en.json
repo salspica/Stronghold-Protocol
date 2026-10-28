@@ -3312,5 +3312,9 @@
   "最终首领血量": "Final boss HP",
   "第 14 / 15 回合的首领生命值按所选倍数提高，默认 ×1 保持官方数值。": "Raises the leader HP in rounds 14 and 15 by the chosen multiplier; the default ×1 keeps the official values.",
   "默认 ×1": "Default ×1",
-  "{rules} · 最终首领 ×{n}": "{rules} · final boss ×{n}"
+  "{rules} · 最终首领 ×{n}": "{rules} · final boss ×{n}",
+  "自选干员自定义改动": "Custom 自选 operator changes",
+  "结城理、丰川祥子等 8 名干员使用自定义盟约与特质；关闭时恢复其原本盟约且没有特质。": "The eight hand-designed picks (结城理, 丰川祥子, …) use their custom bonds and 特质; off restores their derived bonds and no 特质.",
+  "{rules} · 自选干员自定义": "{rules} · 自选 custom",
+  "拖动旋钮，在 1–100 倍之间自由调节第 14 / 15 回合的首领生命值；默认 ×1 保持官方数值。": "Drag the dial to set the Final Assault / Hidden Core leader HP from ×1 to ×100; ×1 keeps the official value."
 }

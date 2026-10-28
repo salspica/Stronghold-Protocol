@@ -245,6 +245,22 @@ test('player-owned effect context draws and grants only its personal pool copies
   assert.deepEqual(collectViolations(m), []);
 });
 
+test('room custom 自选 switch: host-only, snapshotted into the match, default off', t => {
+  const h = lobbyFixture(t), { owner, members } = h.room(2, { revivalEnabled: false, disableSharedPool: false, customDiy: true });
+  assert.deepEqual(owner.toState().experimental, { revivalEnabled: false, disableSharedPool: false, customDiy: true });
+  assert.ok(Object.isFrozen(owner.experimental));
+  h.lobby.ready(members[1], { ready: true });
+  assert.equal(h.lobby.setExperimental(members[0], { experimental: { ...opts(), customDiy: 'true' } }).error, ERR.BAD_MSG);
+  assert.equal(h.lobby.setExperimental(members[1], { experimental: { ...opts(), customDiy: true } }).error, ERR.NOT_HOST);
+  assert.deepEqual(h.lobby.setExperimental(members[0], { experimental: opts() }), { ok: true });
+  assert.equal(owner.experimental.customDiy, undefined, 'off is dropped');
+  assert.deepEqual(h.lobby.setExperimental(members[0], { experimental: { ...opts(), customDiy: true } }), { ok: true });
+  assert.equal(owner.seatOf(members[1].playerId).ready, false, 'option change un-readies teammates');
+  h.lobby.ready(members[1], { ready: true });
+  assert.deepEqual(h.lobby.start(members[0]), { ok: true });
+  assert.equal(owner.match.opts.experimental.customDiy, true);
+});
+
 test('GameHost validates and forwards experimental options, rejecting incoherent redundant flags', t => {
   const host = new GameHost({ MatchClass: RecordingMatch }); t.after(() => host.close());
   const spec = { assignmentId: 'new-options', roomCode: 'TEST', build: 'fixture', protocol: 1, seed: 7, matchNo: 1,
@@ -263,9 +279,11 @@ test('room boss-HP multiplier: host-only, snapshot into the match, invalid value
   assert.deepEqual(owner.toState().experimental, { revivalEnabled: false, disableSharedPool: false, bossHpMul: 10 });
   assert.ok(Object.isFrozen(owner.experimental));
   h.lobby.ready(members[1], { ready: true });
-  for (const bad of [7, 0, 1.5, '10', 1000]) {
+  for (const bad of [0, 101, -5, 1.5, '10', true]) {
     assert.equal(h.lobby.setExperimental(members[0], { experimental: { ...opts(), bossHpMul: bad } }).error, ERR.BAD_MSG, String(bad));
   }
+  assert.deepEqual(h.lobby.setExperimental(members[0], { experimental: { ...opts(), bossHpMul: 7 } }), { ok: true });
+  assert.equal(owner.experimental.bossHpMul, 7);
   assert.equal(h.lobby.setExperimental(members[1], { experimental: { ...opts(), bossHpMul: 100 } }).error, ERR.NOT_HOST);
   assert.deepEqual(h.lobby.setExperimental(members[0], { experimental: { ...opts(), bossHpMul: 100 } }), { ok: true });
   assert.equal(owner.seatOf(members[1].playerId).ready, false, 'option change un-readies teammates');

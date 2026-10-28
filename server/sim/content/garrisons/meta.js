@@ -121,13 +121,22 @@ H.SERVER_ADD_BOND_METHOD = {
     const bonds = ids(bbStr.bond);
     const ra = requireActiveOf(garrison);
     const me = selfView(ctx);
+    // 自身盟约: the piece's bonds as the match counts them (变形同构体 grants included) — the listed `bond` then only
+    // selects what to count (涤火杰西卡's Victoria tiers), and every counted step lands on all of the own bonds.
+    const target = bbStr.bond_type === 'bond_self' ? metaBonds(ctx, me) : bonds;
     switch (bbStr.add_method) {
-      case 'shoplv': addAll(ctx, bonds, ctx.shopLevel() * multi, ra); break;
-      case 'round_gain_char': addAll(ctx, bonds, (ctx.roundStats().gainedChess | 0) * multi, ra); break;
-      case 'hand_count': addAll(ctx, bonds, ctx.hand().filter((p) => p && p.kind === 'chess').length * multi, ra); break;
-      case 'same_row': addAll(ctx, bonds, sameRowCount(ctx, me) * multi, ra); break;
+      case 'shoplv': addAll(ctx, target, ctx.shopLevel() * multi, ra); break;
+      case 'round_gain_char': addAll(ctx, target, (ctx.roundStats().gainedChess | 0) * multi, ra); break;
+      case 'hand_count': addAll(ctx, target, ctx.hand().filter((p) => p && p.kind === 'chess').length * multi, ra); break;
+      case 'same_row': addAll(ctx, target, sameRowCount(ctx, me) * multi, ra); break;
       case 'same_bond_diff_lv':
-        for (const b of bonds) addAll(ctx, [b], distinctTiers(ctx, (p) => metaBonds(ctx, p).includes(b)).size * multi, ra);
+        if (bbStr.bond_type === 'bond_self') {
+          let n = 0;
+          for (const b of bonds) n += distinctTiers(ctx, (p) => metaBonds(ctx, p).includes(b)).size * multi;
+          addAll(ctx, target, n, ra);
+        } else {
+          for (const b of bonds) addAll(ctx, [b], distinctTiers(ctx, (p) => metaBonds(ctx, p).includes(b)).size * multi, ra);
+        }
         break;
       default: break;
     }
@@ -195,7 +204,9 @@ H.SERVER_ADD_BOND_ROUND_COIN_COST = {
 H.SERVER_ADD_REFRESH_CNT_MULTIPLIER_BOND_LAYER = {
   run(ctx) {
     const { bb, bbStr, garrison, piece } = ctx.source;
-    let n = (ctx.roundStats().refreshes | 0) * num(bb.multiplier);
+    // 丰川祥子 counts every 2 refreshes (bb.per_refreshes), the official records every refresh (absent = 1)
+    const per = Math.max(1, num(bb.per_refreshes, 1));
+    let n = Math.floor((ctx.roundStats().refreshes | 0) / per) * num(bb.multiplier);
     if (num(bb.max_layer, 0) > 0) n = Math.min(n, num(bb.max_layer));
     // 自身盟约 (a hand-designed pick): the piece's bonds as the match counts them, 变形同构体's grant included — never a
     // fixed list. Every other record names its bonds in bbStr.bond.
@@ -245,6 +256,38 @@ H.SERVER_GAIN_EQUIP = {
     const { bb, bbStr } = ctx.source;
     if (!ctx.gd.item(bbStr.chess)) return;
     for (let i = 0; i < Math.min(10, num(bb.count, 1)); i++) ctx.grantItem(bbStr.chess, { requirePool: false });
+  },
+};
+
+/**
+ * 「<获取时>获得…」 with explicit rewards (the fork's hand-designed picks): `bbStr.items` = "itemId[:count],…" and
+ * `bbStr.chess_ids` = "chessId,…" (each granted once, ignoring shared stock like SERVER_GAIN_EQUIP).
+ */
+H.SERVER_GAIN_REWARDS = {
+  run(ctx) {
+    const { bbStr } = ctx.source;
+    for (const spec of String(bbStr.items || '').split(',').map((x) => x.trim()).filter(Boolean)) {
+      const [id, raw] = spec.split(':');
+      if (!ctx.gd.item(id)) continue;
+      for (let i = 0; i < Math.min(10, Math.max(0, num(raw, 1))); i++) ctx.grantItem(id, { requirePool: false });
+    }
+    for (const id of ids(bbStr.chess_ids)) {
+      if (!ctx.gd.chess(id)) continue;
+      ctx.grantChess(id, { requirePool: false });
+    }
+  },
+};
+
+/** 「<休整期开始时>随机获得 A/B/C 中的一名」: an explicit `bbStr.chess_ids` list, `bb.count` draws (default 1). */
+H.SERVER_GAIN_RANDOM_CHESS = {
+  run(ctx) {
+    const { bb, bbStr } = ctx.source;
+    const list = ids(bbStr.chess_ids).filter((id) => ctx.gd.chess(id));
+    if (!list.length) return;
+    for (let i = 0; i < Math.min(10, num(bb.count, 1)); i++) {
+      const id = list[Math.min(list.length - 1, Math.floor(ctx.rng() * list.length))];
+      ctx.grantChess(id, { requirePool: false });
+    }
   },
 };
 

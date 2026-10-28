@@ -661,22 +661,24 @@ export class DataSource {
    * or when the data lacks it. An owned pick is composed at `potential` (1–6, default 6; shared/diy.js diyRecordOf —
    * `def.loadout.potential`, its summons' variants follow); a prototype has none. Cached per (id, pick, potential).
    * @param {string} id
-   * @param {{ charId?: string, skillIndex?: number|null, uniEquipId?: string|null }} pick
+   * @param {{ charId?: string, skillIndex?: number|null, uniEquipId?: string|null, custom?: boolean }} pick
    * @param {number|null} [potential]
    */
   getDiy(id, pick, potential = null) {
     const pot = isPotential(potential) ? potential : POTENTIAL_DEFAULT;
-    const key = `${id}|diy|${pick?.charId ?? ''}|${pick?.skillIndex ?? ''}|${pick?.uniEquipId ?? ''}|p${pot}`;
+    const custom = pick?.custom === true;
+    const key = `${id}|diy|${pick?.charId ?? ''}|${pick?.skillIndex ?? ''}|${pick?.uniEquipId ?? ''}|p${pot}${custom ? '|custom' : ''}`;
     if (this._chess.has(key)) return this._chess.get(key);
     const r = this.rawChess(id);
-    const rec = r && r.isDiy ? diyRecordOf(r, pick, this, { potential: pot }) : null;
+    const rec = r && r.isDiy ? diyRecordOf(r, pick, this, { potential: pot, custom }) : null;
     let d = null;
     if (rec) {
       d = normalizeChess({ ...rec, chessId: id });
       const own = rec.diyProto ? POTENTIAL_DEFAULT : pot;
       d.loadout = {
         ...resolveLoadout(rec, null), potential: own, potentialIsDefault: own === POTENTIAL_DEFAULT,
-        diy: { charId: rec.charId, skillIndex: rec.skill.index, uniEquipId: rec.module?.id ?? null },
+        diy: { charId: rec.charId, skillIndex: rec.skill.index, uniEquipId: rec.module?.id ?? null,
+          ...(custom ? { custom: true } : null) },
       };
       d.tokenOwner = diyTokenOwner(rec.charId, rec.status);
       freezeDef(d);

@@ -754,7 +754,7 @@ export function specBounds(spec, gd = null) {
       all.set(u.uid, defId);
       if (gd) {
         const base = gd.chess?.(defId) || gd.token?.(defId);
-        const rec = u.standIn === true ? gd.standIn?.(defId) : u.diy && base?.isDiy ? diyRecordOf(base, u.diy, gd.raw) : base;
+        const rec = u.standIn === true ? gd.standIn?.(defId) : u.diy && base?.isDiy ? diyRecordOf(base, u.diy, gd.raw, { custom: u.diy.custom === true }) : base;
         if (typeof rec?.name === 'string') names.set(u.uid, rec.name);
       }
       if (typeof defId === 'string') defIds.add(defId);

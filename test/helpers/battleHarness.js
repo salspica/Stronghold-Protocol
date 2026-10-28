@@ -188,14 +188,14 @@ function buildData(defs) {
  * A harness `units[]` entry with `diy` → its PlayerBattleInput fields: `chessId` = the slot's normal or elite id, `diy` =
  * the pick ({ charId, skillIndex, uniEquipId } as given). Other entries unchanged.
  */
-function diyEntry(u, data = getDefaultSource()) {
+function diyEntry(u, data = getDefaultSource(), customDiy = false) {
   if (!u || !u.diy || typeof u.diy !== 'object') return u;
   const slots = data.rawBackups?.()?.diy?.slots ?? {};
   const { slot, ...pick } = u.diy;
   const base = typeof slot === 'number' ? Object.keys(slots).find((id) => slots[id].tier === slot) : slot;
   if (!base || !slots[base]) throw new Error(`diy: unknown slot ${slot}`);
   const { elite, ...rest } = u;
-  return { ...rest, chessId: elite ? slots[base].goldenId : base, diy: pick };
+  return { ...rest, chessId: elite ? slots[base].goldenId : base, diy: customDiy ? { ...pick, custom: true } : pick };
 }
 
 /** `units[].standIn` objects → the composed records for `defs.chess` (null when there are none). */
@@ -244,7 +244,7 @@ export function makeBattle(opts = {}) {
   if (extraRoutes.length) routes = routes.concat(extraRoutes);
   const players = opts.players ?? [{
     playerId: 'p1', seat: 0, side: 'L', colOffset: 0,
-    units: (opts.units ?? []).map((u, i) => ({ uid: u.uid ?? i + 1, kind: u.kind ?? 'chess', ...diyEntry(u), ...(u.standIn ? { standIn: true } : null) })),
+    units: (opts.units ?? []).map((u, i) => ({ uid: u.uid ?? i + 1, kind: u.kind ?? 'chess', ...diyEntry(u, undefined, opts.customDiy === true), ...(u.standIn ? { standIn: true } : null) })),
     bonds: opts.bonds ?? {}, bandId: opts.bandId ?? null, playerEffects: opts.playerEffects ?? [],
   }];
   const hookNames = opts.hooks ?? ALL_HOOKS;

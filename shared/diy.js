@@ -9,9 +9,10 @@
 // - the picks of a tier: the owned 6★ outside the chess pool (`diy.ownedPool`: no preset operator, no collab) and the
 //   nine 6★ prototypes at both tiers, the six 4★ reserves (not 先锋 / 特种) at tier 5 only (`diy.prototypes[tier]`);
 // - a prototype may fill one tier-5 and one tier-6 slot, an owned operator one slot; the two picks of a tier differ;
-// - no 特质 (PRTS "甄选加入的干员不会拥有任何特质"), except the two hand-designed collab picks below, which carry one
-//   record per form (`diy.operators[id].garrisons`, tools/build-data.mjs DIY_GARRISON_IDS); bonds from the operator's
-//   factions (`diy.operators[id].bonds`);
+// - no 特质 (PRTS "甄选加入的干员不会拥有任何特质"), except the eight hand-designed picks below in an experimental room
+//   (`experimental.customDiy`), which carry one record per form (`diy.operators[id].custom.garrisons`, tools/build-data.mjs
+//   DIY_GARRISON_IDS); bonds from the operator's factions (`diy.operators[id].bonds`), or `diy.operators[id].custom.bonds`
+//   when that room option is on;
 // - the normal form is E2 Lv1, skill rank 4, no module; the elite E2 Lv60, rank 7, its module at stage 1 (tier 5) or 3
 //   (tier 6) — the slot record's `status` (activity_table diyChessDict) picks the unit form;
 // - an owned pick chooses its skill (any of 3) and module (any of its modules, or none — a roster never carries a module
@@ -205,10 +206,11 @@ export function checkDiyPick(slotId, pick, data) {
  * @param {object} slot a DIY chess record (data/chess.json, `isDiy`)
  * @param {DiyPick} pick
  * @param {DiyData} data
- * @param {{ potential?: number|null }} [opts]
+ * @param {{ potential?: number|null, custom?: boolean }} [opts] `custom` = the experimental room's hand-designed
+ * bonds / 特质 (`diy.operators[id].custom`); otherwise the derived bonds and no 特质
  * @returns {object|null}
  */
-export function diyRecordOf(slot, pick, data, { potential = null } = {}) {
+export function diyRecordOf(slot, pick, data, { potential = null, custom = false } = {}) {
   if (!isObj(slot) || !slot.isDiy || typeof slot.chessId !== 'string') return null;
   const c = checkDiyPick(slot.chessId, pick, data);
   if (!('ok' in c)) return null;
@@ -218,13 +220,15 @@ export function diyRecordOf(slot, pick, data, { potential = null } = {}) {
   const proto = isPrototypePick(data, slot.tier, charId);
   const form = unitForm(backups, charId, slot.status);
   const op = diyOf(data)?.operators?.[charId] ?? null;
-  // a 自选 piece carries no 特质 by default; the two hand-designed picks get the operator's own record for this form
-  // (data/backups.json diy.operators[id].garrisons, built from tools/build-data.mjs DIY_GARRISON_IDS)
+  // A normal room: the bonds derived from the operator's factions and no 特质 (PRTS: 甄选加入的干员不会拥有任何特质).
+  // An experimental room: the owner's hand-designed `custom` bonds / records (data/backups.json diy.operators[id].custom,
+  // tools/build-data.mjs DIY_BOND_OVERRIDES + DIY_GARRISON_IDS).
+  const chosen = custom && op?.custom ? op.custom : op;
   const elite = (slot.status?.equipLevel ?? 0) > 0;
   const rec = composeUnitRecord(slot, unit, proto ? form : atPotential(form, potential),
     {
-      skillIndex, moduleId: uniEquipId, bonds: op?.bonds ?? null,
-      garrisonIds: op?.garrisons?.[elite ? 'elite' : 'normal'] ?? null,
+      skillIndex, moduleId: uniEquipId, bonds: chosen?.bonds ?? null,
+      garrisonIds: chosen?.garrisons?.[elite ? 'elite' : 'normal'] ?? null,
     });
   if (!rec || !rec.skill) return null;
   rec.diyFor = slot.baseId ?? slot.chessId;
@@ -237,13 +241,13 @@ export function diyRecordOf(slot, pick, data, { potential = null } = {}) {
  * tier 5 / 3 at tier 6), else the normal form (E2 Lv1, no module); `potential` as diyRecordOf.
  * @param {string} slotId the slot's base id (an elite id is accepted and taken as the elite)
  * @param {DiyPick} pick
- * @param {{ elite?: boolean, data: DiyData, potential?: number|null }} opts
+ * @param {{ elite?: boolean, data: DiyData, potential?: number|null, custom?: boolean }} opts
  * @returns {object|null}
  */
-export function diyRecord(slotId, pick, { elite = false, data, potential = null } = { data: null }) {
+export function diyRecord(slotId, pick, { elite = false, data, potential = null, custom = false } = { data: null }) {
   const slot = diySlot(slotId, data);
   if (!slot) return null;
-  return diyRecordOf(elite || slot.elite ? slot.golden : slot.normal, pick, data, { potential });
+  return diyRecordOf(elite || slot.elite ? slot.golden : slot.normal, pick, data, { potential, custom });
 }
 
 /**

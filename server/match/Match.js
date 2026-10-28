@@ -462,6 +462,7 @@ export class Match {
     /** Locked room-owned rules; direct engine fixtures retain the legacy option names. */
     this.experimental = experimentalOptions(opts.experimental ?? {
       revivalEnabled: opts.revivalEnabled === true, disableSharedPool: opts.disableSharedPool === true,
+      customDiy: opts.customDiy === true,
     });
     this.revivalEnabled = !this.isSolo && this.experimental.revivalEnabled;
     this.disableSharedPool = this.experimental.disableSharedPool;
@@ -469,6 +470,8 @@ export class Match {
     this.capacityExperiment = !this.isSolo && this.playerCapacity > 4;
     this.twentyPlayerMode = this.capacityExperiment && this.playerCapacity === 20;
     this.disableDuckLord = this.capacityExperiment && this.experimental.disableDuckLord === true;
+    /** 自选干员自定义盟约 / 特质 (experimental options): the eight hand-designed picks; off = derived bonds, no 特质. */
+    this.customDiy = this.experimental.customDiy === true;
     /** 最终首领血量 (experimental options): R14 Final Assault / R15 Hidden Core pool × 1 / 5 / 10 / 100. */
     this.bossHpMul = this.experimental.bossHpMul ?? 1;
     this.gd.disableDuckLord = this.disableDuckLord;

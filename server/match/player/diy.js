@@ -164,8 +164,9 @@ export class PlayerDiy {
       let normal;
       let golden;
       try {
-        normal = diyRecord(slotId, pick, { elite: false, data });
-        golden = diyRecord(slotId, pick, { elite: true, data });
+        const custom = !!this.m.customDiy;
+        normal = diyRecord(slotId, pick, { elite: false, data, custom });
+        golden = diyRecord(slotId, pick, { elite: true, data, custom });
       } catch { normal = null; golden = null; }
       if (!slot || !normal || !golden) continue;
       records.set(slot.baseId, Object.freeze(normal));

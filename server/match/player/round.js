@@ -140,7 +140,8 @@ export class PlayerRound {
         if (pick) {
           // 0.2.0 自选编队: a slotted DIY slot fights as its pick (sim getChess(id, { diy }): the operator's body, the pick's
           // skill and module — no loadout fields, docs/SIM.md §12)
-          u.diy = { charId: pick.charId, skillIndex: pick.skillIndex, uniEquipId: pick.uniEquipId };
+          u.diy = { charId: pick.charId, skillIndex: pick.skillIndex, uniEquipId: pick.uniEquipId,
+            ...(this.m.customDiy ? { custom: true } : null) };
         } else if (this.fieldsStandIn(piece.id)) {
           // 0.2.0 补位: a chess this player does not own fights as its stand-in (sim getChess(id, { standIn: true }): the
           // backup skill / module — no loadout fields, docs/SIM.md §12)

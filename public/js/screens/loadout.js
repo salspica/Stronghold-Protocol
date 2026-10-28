@@ -1121,7 +1121,7 @@ function LoadoutScreen({ st, leaving = false }) {
       : html`<p class=${cx('lo-note', locked && 'is-locked')}><${Icon} name="info" />${locked ? lockedText : fromText}</p>`}
     ${!ready ? html`<div class="lo-loading"><${Spinner} size="sm" />${t('正在载入干员数据（打开页面后仅载入一次）…')}</div>`
       : lost.length ? html`<${DataMissing} files=${lost} />` : tab === 'diy'
-      ? html`<${DiyPanel} m=${m} picks=${st.diy || {}} legal=${diyLegal} kitted=${st.diyKitted} onSet=${setDiySlot} skins=${st.skins} skinSync=${st.skinSync} onSkins=${setSkins} ops=${st.ops} onOps=${setOpsOf} />`
+      ? html`<${DiyPanel} m=${m} picks=${st.diy || {}} legal=${diyLegal} kitted=${st.diyKitted} onSet=${setDiySlot} skins=${st.skins} skinSync=${st.skinSync} onSkins=${setSkins} ops=${st.ops} onOps=${setOpsOf} customDiy=${m.room?.experimental?.customDiy === true} />`
       : tab === 'ownership'
       ? html`<${OwnershipPanel} m=${m} roster=${ownRoster} notOwned=${st.notOwned} onToggle=${toggleOwned} />`
       : deck ? html`<main class="lo-deckwrap">

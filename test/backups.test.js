@@ -322,28 +322,42 @@ test('DIY: the owned-6★ pool and the faction → bond rule (mainPower + every 
   assert.equal(core.length, 8);
   for (const [id, o] of Object.entries(operators)) {
     const hit = core.filter((b) => b.powerIdList.some((p) => o.powers.includes(p))).map((b) => b.bondId);
-    // tools/build-data.mjs DIY_BOND_OVERRIDES (the owner's decision of 2026-10-27, updated the same evening): a
-    // hand-designed set replaces the derived one for these three; their add-on bonds have an empty powerIdList and
-    // cannot be derived at all.
+    // tools/build-data.mjs DIY_BOND_OVERRIDES (the owner's decisions of 2026-10-27 / 2026-10-28): the hand-designed set
+    // lives under `custom` and only an experimental room (experimental.customDiy) uses it; the default is the derived set.
     const hand = {
+      char_4217_makoto: ['lateranoShip', 'miraShip', 'visiShip'],
       char_4182_oblvns: ['siracusaShip', 'swiftShip', 'arcaneShip'],
-      char_4217_makoto: ['lateranoShip', 'visiShip', 'miraShip'],
-      char_4231_clemnt: ['egirShip', 'swiftShip', 'indomShip'],
+      char_4138_narant: ['sargonShip', 'swiftShip', 'preciShip'],
+      char_4132_ascln: ['kjeragShip', 'skillfulShip', 'swiftShip'],
+      char_1044_hsgma2: ['kazimierzShip', 'indomShip', 'raidShip', 'preciShip'],
+      char_2027_wang: ['yanShip', 'skillfulShip', 'arcaneShip'],
+      char_4231_clemnt: ['egirShip', 'indomShip', 'swiftShip', 'raidShip', 'skillfulShip'],
+      char_1034_jesca2: ['victoriaShip', 'skillfulShip', 'miraShip'],
     }[id];
-    assert.deepEqual(o.bonds, hand ?? (hit.length ? hit : [config.economy.fallbackBondId]), `${id}: bonds from powers`);
-    // and their 卫戍特质 (tools/build-data.mjs DIY_GARRISON_IDS): none by default, one record per form for these three
+    assert.deepEqual(o.bonds, hit.length ? hit : [config.economy.fallbackBondId], `${id}: derived bonds from powers`);
+    // and their 卫戍特质 (tools/build-data.mjs DIY_GARRISON_IDS): none by default, kept under `custom` for a room that asks
     const want = {
-      char_4182_oblvns: { normal: ['garrison_901_a'], elite: ['garrison_901_b'] },
       char_4217_makoto: { normal: ['garrison_900_a'], elite: ['garrison_900_b'] },
+      char_4182_oblvns: { normal: ['garrison_901_a'], elite: ['garrison_901_b'] },
       char_4231_clemnt: { normal: ['garrison_902_a'], elite: ['garrison_902_b'] },
+      char_4138_narant: { normal: ['garrison_903_a', 'garrison_904_a', 'garrison_905_a'], elite: ['garrison_903_b', 'garrison_904_b', 'garrison_905_b'] },
+      char_4132_ascln: { normal: ['garrison_906_a', 'garrison_907_a'], elite: ['garrison_906_b', 'garrison_907_b'] },
+      char_1044_hsgma2: { normal: ['garrison_908_a'], elite: ['garrison_908_b'] },
+      char_2027_wang: { normal: ['garrison_909_a', 'garrison_910_a'], elite: ['garrison_909_b', 'garrison_910_b'] },
+      char_1034_jesca2: { normal: ['garrison_911_a', 'garrison_912_a'], elite: ['garrison_911_b', 'garrison_912_b'] },
     }[id];
-    assert.deepEqual(o.garrisons, want ?? undefined, `${id}: garrisons`);
+    assert.equal(o.garrisons, undefined, `${id}: no default 特质`);
+    assert.deepEqual(o.custom?.bonds, hand, `${id}: custom bonds`);
+    assert.deepEqual(o.custom?.garrisons, want, `${id}: custom garrisons`);
     if (want) for (const gid of [...want.normal, ...want.elite]) assert.ok(garrisons[gid], `${gid}: a garrison record`);
   }
   const tally = {};
   for (const id of ownedPool) { const k = operators[id].bonds.join('+'); tally[k] = (tally[k] || 0) + 1; }
-  // the three hand-designed picks (DIY_BOND_OVERRIDES) form their own keys; the rest are unchanged
-  assert.deepEqual(tally, { emptyShip: 38, yanShip: 14, victoriaShip: 8, sargonShip: 4, siracusaShip: 4, lateranoShip: 1, kazimierzShip: 1, 'yanShip+victoriaShip': 1, 'siracusaShip+swiftShip+arcaneShip': 1, 'lateranoShip+visiShip+miraShip': 1, 'egirShip+swiftShip+indomShip': 1 });
+  // the default (derived) sets of the eight hand-designed picks
+  assert.deepEqual(tally, {
+    emptyShip: 39, yanShip: 14, victoriaShip: 8, sargonShip: 4, siracusaShip: 4, lateranoShip: 2, kazimierzShip: 1,
+    egirShip: 1, 'yanShip+victoriaShip': 1,
+  });
   // the collab operators are out of the data and the pool (the owner's decision of 2026-10-05: copyright), except the
   // two this fork admits on purpose (tools/build-data.mjs DIY_INCLUDED_CHARS, the owner's decision of 2026-10-27)
   assert.deepEqual(backups.diy.excluded.map((id) => [id, backups.units[id], operators[id]]),

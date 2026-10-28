@@ -548,37 +548,61 @@ const DIY_EXCLUDED_TEAMS = Object.freeze(['rainbow', 'action4', 'mujica', 'sees'
  */
 const DIY_INCLUDED_CHARS = Object.freeze(['char_4182_oblvns', 'char_4217_makoto']);
 /**
- * Hand-designed bond sets for those three picks (the owner's decisions of 2026-10-27 and 2026-10-27 evening): a
- * deliberate deviation from the "a 自选 piece's bonds come from its factions" rule. Their 奥术 / 迅捷 / 远见 / 奇迹
- * bonds are add-on bonds whose `powerIdList` is empty, so no derivation could ever reach them; the owner picked the
- * combination instead.
+ * Hand-designed bond sets for the eight hand-designed picks (the owner's decisions of 2026-10-27 / 2026-10-28): a
+ * deliberate deviation from the "a 自选 piece's bonds come from its factions" rule. Their 奥术 / 迅捷 / 远见 / 奇迹 /
+ * 精准 / 突袭 / 灵巧 bonds are add-on bonds whose `powerIdList` is empty, so no derivation could ever reach them; the
+ * owner picked the combination instead.
+ *   结城理:   拉特兰 + 奇迹 + 远见     (lateranoShip + miraShip + visiShip)
  *   丰川祥子: 叙拉古 + 迅捷 + 奥术     (siracusaShip + swiftShip + arcaneShip)
- *   结城理:   拉特兰 + 远见 + 奇迹     (lateranoShip + visiShip + miraShip)
- *   克莱门莎: 阿戈尔 + 迅捷 + 不屈     (egirShip + swiftShip + indomShip)
+ *   娜仁图亚: 萨尔贡 + 迅捷 + 精准     (sargonShip + swiftShip + preciShip)
+ *   阿斯卡纶: 谢拉格 + 灵巧 + 迅捷     (kjeragShip + skillfulShip + swiftShip)
+ *   斩业星熊: 卡西米尔 + 不屈 + 突袭 + 精准 (kazimierzShip + indomShip + raidShip + preciShip)
+ *   望:       炎 + 灵巧 + 奥术         (yanShip + skillfulShip + arcaneShip)
+ *   克莱门莎: 阿戈尔 + 不屈 + 迅捷 + 突袭 + 灵巧 (egirShip + indomShip + swiftShip + raidShip + skillfulShip)
+ *   涤火杰西卡: 维多利亚 + 灵巧 + 奇迹  (victoriaShip + skillfulShip + miraShip)
  */
 const DIY_BOND_OVERRIDES = Object.freeze({
+  char_4217_makoto: Object.freeze(['lateranoShip', 'miraShip', 'visiShip']),
   char_4182_oblvns: Object.freeze(['siracusaShip', 'swiftShip', 'arcaneShip']),
-  char_4217_makoto: Object.freeze(['lateranoShip', 'visiShip', 'miraShip']),
-  char_4231_clemnt: Object.freeze(['egirShip', 'swiftShip', 'indomShip']),
+  char_4138_narant: Object.freeze(['sargonShip', 'swiftShip', 'preciShip']),
+  char_4132_ascln: Object.freeze(['kjeragShip', 'skillfulShip', 'swiftShip']),
+  char_1044_hsgma2: Object.freeze(['kazimierzShip', 'indomShip', 'raidShip', 'preciShip']),
+  char_2027_wang: Object.freeze(['yanShip', 'skillfulShip', 'arcaneShip']),
+  char_4231_clemnt: Object.freeze(['egirShip', 'indomShip', 'swiftShip', 'raidShip', 'skillfulShip']),
+  char_1034_jesca2: Object.freeze(['victoriaShip', 'skillfulShip', 'miraShip']),
 });
 /**
- * 卫戍特质 (garrisons) of those three picks (the owner's decisions of 2026-10-27 evening). A 自选 piece carries none
- * (PRTS: 甄选加入的干员不会拥有任何特质); these get one each, modelled on the official record whose trigger it
- * copies, with one record per form so the elite pick gets the higher amount:
- *   结城理 — garrison_40's "自身被击倒或替身与本体进行切换时" (act1autochess_gar_event_selfdead, bond_self):
- *     +10 (normal) / +20 (elite) to his own active bonds, once per 替身 ⇄ 本体 switch and once per knock-out.
- *   丰川祥子 — garrison_122's "本回合每刷新过1次" (SERVER_ADD_REFRESH_CNT_MULTIPLIER_BOND_LAYER): +15 / +30 per
- *     refresh of the round, at 休整期结束, to her own active bonds.
- *   克莱门莎 — a kill trait on act1autochess_gar_event_selfkillenemy: every kill adds +10 阿戈尔, +5 迅捷, +5 不屈
- *     (normal) / +20 / +10 / +10 (elite) — `bond_add_by_id` gives each bond its own amount (battle.js fireGain).
- * The 结城理 / 丰川祥子 traits name the unit's OWN bonds (bond_self), never a fixed list: 变形同构体 + a bond item
- * (转职) adds a bond at runtime and it gains too (support.unitBonds / metaBonds include those grants).
+ * 卫戍特质 (garrisons) of those eight picks (the owner's decisions of 2026-10-27 evening / 2026-10-28). A 自选 piece
+ * carries none (PRTS: 甄选加入的干员不会拥有任何特质); these get hand-designed traits, one record per trigger and one record
+ * per form so the elite pick gets the higher amount:
+ *   结城理   — knock-out or 替身 ⇄ 本体 switch: own active bonds +5 / +10 (act1autochess_gar_event_selfdead, bond_self).
+ *   丰川祥子 — at 休整期结束, every 2 refreshes of the round: own active bonds +10 / +20
+ *              (SERVER_ADD_REFRESH_CNT_MULTIPLIER_BOND_LAYER, per_refreshes 2, bond_self).
+ *   娜仁图亚 — on gain: 黄沙罗盘 + 萨尔贡浓茶 + 迅捷作战粮 (SERVER_GAIN_REWARDS); at 休整期开始: one random of
+ *              缇缇 / 佩佩 / 异客 (SERVER_GAIN_RANDOM_CHESS); in battle: every 萨尔贡 operator's skill start gives own
+ *              active bonds +3 / +6 (act1autochess_gar_event_useskill, scope bond:sargonShip, bond_self).
+ *   阿斯卡纶 — on gain: two 谢拉格不融冰; in battle: an enemy entering 冻结 inside her range gives own active bonds
+ *              +3 / +6 (act1autochess_gar_event_enemy_abflag_inrange, bond_self).
+ *   斩业星熊 — in battle, knocked out: own active bonds +50 / +100 (act1autochess_gar_event_selfdead, bond_self).
+ *   望       — on gain: 缪尔赛思 + 炎国短刀 (SERVER_GAIN_REWARDS); at 休整期结束, per operator gained this round: own
+ *              active bonds +10 / +20 (SERVER_ADD_BOND_METHOD round_gain_char, bond_self).
+ *   克莱门莎 — every kill: own active bonds +6 / +12 (act1autochess_gar_event_selfkillenemy, bond_self).
+ *   涤火杰西卡 — at 休整期开始: one random of 维娜 / 号角 / 烛煌 (SERVER_GAIN_RANDOM_CHESS); at 休整期结束, per
+ *              distinct-tier 维多利亚 operator on the field: own active bonds +10 / +20 (SERVER_ADD_BOND_METHOD
+ *              same_bond_diff_lv, bond:victoriaShip, bond_self).
+ * The "自身盟约" traits name the unit's OWN bonds (bond_self), never a fixed list: 变形同构体 + a bond item (转职) adds
+ * a bond at runtime and it gains too (support.unitBonds / metaBonds include those grants).
  * data/garrisons.json is generated: change this table, never the JSON.
  */
 const DIY_GARRISON_IDS = Object.freeze({
-  char_4217_makoto: Object.freeze({ normal: 'garrison_900_a', elite: 'garrison_900_b' }),
-  char_4182_oblvns: Object.freeze({ normal: 'garrison_901_a', elite: 'garrison_901_b' }),
-  char_4231_clemnt: Object.freeze({ normal: 'garrison_902_a', elite: 'garrison_902_b' }),
+  char_4217_makoto: Object.freeze({ normal: ['garrison_900_a'], elite: ['garrison_900_b'] }),
+  char_4182_oblvns: Object.freeze({ normal: ['garrison_901_a'], elite: ['garrison_901_b'] }),
+  char_4231_clemnt: Object.freeze({ normal: ['garrison_902_a'], elite: ['garrison_902_b'] }),
+  char_4138_narant: Object.freeze({ normal: ['garrison_903_a', 'garrison_904_a', 'garrison_905_a'], elite: ['garrison_903_b', 'garrison_904_b', 'garrison_905_b'] }),
+  char_4132_ascln: Object.freeze({ normal: ['garrison_906_a', 'garrison_907_a'], elite: ['garrison_906_b', 'garrison_907_b'] }),
+  char_1044_hsgma2: Object.freeze({ normal: ['garrison_908_a'], elite: ['garrison_908_b'] }),
+  char_2027_wang: Object.freeze({ normal: ['garrison_909_a', 'garrison_910_a'], elite: ['garrison_909_b', 'garrison_910_b'] }),
+  char_1034_jesca2: Object.freeze({ normal: ['garrison_911_a', 'garrison_912_a'], elite: ['garrison_911_b', 'garrison_912_b'] }),
 });
 /** The records above, in the shape buildGarrisons emits (DATA.md §4). */
 function buildDiyGarrisons() {
@@ -597,27 +621,90 @@ function buildDiyGarrisons() {
     { bond_add_count: n },
     { key: 'act1autochess_gar_event_selfdead', bond_type: 'bond_self', bond_add_type: 'by_count', garrison_key: id });
   const oblvns = (id, n) => add(id,
-    `<休整期结束时>本回合每刷新过1次，使已激活的自身盟约层数+${n}`,
-    `<休整期结束时>本回合每刷新过1次，使已激活的自身盟约层数<@ba.vup>+${n}</>`,
+    `<休整期结束时>本回合每刷新过2次，使已激活的自身盟约层数+${n}`,
+    `<休整期结束时>本回合每刷新过2次，使已激活的自身盟约层数<@ba.vup>+${n}</>`,
     'SERVER_PREP_FIN', 'SERVER_ADD_REFRESH_CNT_MULTIPLIER_BOND_LAYER', 'SERVER_ADD_REFRESH_CNT_MULTIPLIER_BOND_LAYER', null,
-    { multiplier: n },
+    { multiplier: n, per_refreshes: 2 },
     { bond_type: 'bond_self', conditionkey: 'character_target_inboard', garrison_key: id });
-  const clemnt = (id, egir) => {
-    const swift = Math.max(1, Math.round(egir / 2)), indom = swift;
-    return add(id,
-      `<战斗中>每击杀1名敌人时，使已激活的【阿戈尔】层数+${egir}、【迅捷】层数+${swift}、【不屈】层数+${indom}`,
-      `<战斗中>每击杀1名敌人时，使已激活的【阿戈尔】层数<@ba.vup>+${egir}</>、【迅捷】层数<@ba.vup>+${swift}</>、【不屈】层数<@ba.vup>+${indom}</>`,
-      'IN_BATTLE', 'ADD_BOND', 'act1autochess_gar_event_selfkillenemy', 'env_gbuff_new_with_verify',
-      { bond_add_count: egir, check_cnt: 1 },
-      { key: 'act1autochess_gar_event_selfkillenemy', bond_type: 'bond_by_id', bond_id: 'egirShip,swiftShip,indomShip', bond_add_type: 'by_count', garrison_key: id,
-        bond_add_by_id: `egirShip:${egir},swiftShip:${swift},indomShip:${indom}` });
+  const clemnt = (id, n) => add(id,
+    `<战斗中>每击杀1名敌人时，使已激活的自身盟约层数+${n}`,
+    `<战斗中>每击杀1名敌人时，使已激活的自身盟约层数<@ba.vup>+${n}</>`,
+    'IN_BATTLE', 'ADD_BOND', 'act1autochess_gar_event_selfkillenemy', 'env_gbuff_new_with_verify',
+    { bond_add_count: n, check_cnt: 1 },
+    { key: 'act1autochess_gar_event_selfkillenemy', bond_type: 'bond_self', bond_add_type: 'by_count', garrison_key: id });
+  const narant = (suffix, n) => {
+    const g = (k) => `garrison_${k}_${suffix}`;
+    add(g(903),
+      '<获取时>获得一件黄沙罗盘、一件萨尔贡浓茶和一件迅捷作战粮',
+      '<获取时>获得一件黄沙罗盘、一件萨尔贡浓茶和一件迅捷作战粮',
+      'SERVER_GAIN', 'SERVER_GAIN_REWARDS', 'SERVER_GAIN_REWARDS', null, {},
+      { garrison_key: g(903), items: 'chess_item_6_07_e_a,chess_item_2_04_e_a,chess_item_3_05_e_a' });
+    add(g(904),
+      '<休整期开始时>随机获得缇缇、佩佩、异客中的一名干员',
+      '<休整期开始时>随机获得缇缇、佩佩、异客中的一名干员',
+      'SERVER_PREP_START', 'SERVER_GAIN_RANDOM_CHESS', 'SERVER_GAIN_RANDOM_CHESS', null, { count: 1 },
+      { garrison_key: g(904), chess_ids: 'chess_char_5_02_a,chess_char_6_06_a,chess_char_6_05_a', conditionkey: 'character_target_inboard' });
+    add(g(905),
+      `<战斗中>萨尔贡干员每开启一次技能时，使已激活的自身盟约层数+${n}`,
+      `<战斗中>萨尔贡干员每开启一次技能时，使已激活的自身盟约层数<@ba.vup>+${n}</>`,
+      'IN_BATTLE', 'ADD_BOND', 'act1autochess_gar_event_useskill', 'env_gbuff_new_with_verify',
+      { bond_add_count: n },
+      { key: 'act1autochess_gar_event_useskill', bond_type: 'bond_self', bond_add_type: 'by_count', scope: 'bond:sargonShip', garrison_key: g(905) });
   };
-  makoto('garrison_900_a', 10);
-  makoto('garrison_900_b', 20);
-  oblvns('garrison_901_a', 15);
-  oblvns('garrison_901_b', 30);
-  clemnt('garrison_902_a', 10);
-  clemnt('garrison_902_b', 20);
+  const ascln = (suffix, n) => {
+    const g = (k) => `garrison_${k}_${suffix}`;
+    add(g(906),
+      '<获取时>获得两个谢拉格不融冰',
+      '<获取时>获得两个谢拉格不融冰',
+      'SERVER_GAIN', 'SERVER_GAIN_REWARDS', 'SERVER_GAIN_REWARDS', null, {},
+      { garrison_key: g(906), items: 'chess_item_5_02_e_a:2' });
+    add(g(907),
+      `<战斗中>攻击范围内每有一名敌人冻结时，使已激活的自身盟约层数+${n}`,
+      `<战斗中>攻击范围内每有一名敌人冻结时，使已激活的自身盟约层数<@ba.vup>+${n}</>`,
+      'IN_BATTLE', 'ADD_BOND', 'act1autochess_gar_event_enemy_abflag_inrange', 'env_gbuff_new_with_verify',
+      { bond_add_count: n, prob: 1, check_ab_flag: 16 },
+      { key: 'act1autochess_gar_event_enemy_abflag_inrange', bond_type: 'bond_self', bond_add_type: 'by_count', garrison_key: g(907) });
+  };
+  const hsgma2 = (id, n) => add(id,
+    `<战斗中>自身被击倒时，使已激活的自身盟约层数+${n}`,
+    `<战斗中>自身被击倒时，使已激活的自身盟约层数<@ba.vup>+${n}</>`,
+    'IN_BATTLE', 'ADD_BOND', 'act1autochess_gar_event_selfdead', 'env_gbuff_new_with_verify',
+    { bond_add_count: n },
+    { key: 'act1autochess_gar_event_selfdead', bond_type: 'bond_self', bond_add_type: 'by_count', garrison_key: id });
+  const wang = (suffix, n) => {
+    const g = (k) => `garrison_${k}_${suffix}`;
+    add(g(909),
+      '<获取时>获得一个缪尔赛思和一个炎国短刀',
+      '<获取时>获得一个缪尔赛思和一个炎国短刀',
+      'SERVER_GAIN', 'SERVER_GAIN_REWARDS', 'SERVER_GAIN_REWARDS', null, {},
+      { garrison_key: g(909), items: 'chess_item_3_04_e_a', chess_ids: 'chess_char_6_11_a' });
+    add(g(910),
+      `<休整期结束时>当前休整期每获得过一名干员，使自身已激活的盟约层数+${n}`,
+      `<休整期结束时>当前休整期每获得过一名干员，使自身已激活的盟约层数<@ba.vup>+${n}</>`,
+      'SERVER_PREP_FIN', 'SERVER_ADD_BOND_METHOD', 'SERVER_ADD_BOND_METHOD', null, { multi: n },
+      { garrison_key: g(910), add_method: 'round_gain_char', bond_type: 'bond_self', conditionkey: 'character_target_inboard' });
+  };
+  const jesca2 = (suffix, n) => {
+    const g = (k) => `garrison_${k}_${suffix}`;
+    add(g(911),
+      '<休整期开始时>随机获得维娜、号角、烛煌中的一名干员',
+      '<休整期开始时>随机获得维娜、号角、烛煌中的一名干员',
+      'SERVER_PREP_START', 'SERVER_GAIN_RANDOM_CHESS', 'SERVER_GAIN_RANDOM_CHESS', null, { count: 1 },
+      { garrison_key: g(911), chess_ids: 'chess_char_6_07_a,chess_char_5_08_a,chess_char_5_03_a', conditionkey: 'character_target_inboard' });
+    add(g(912),
+      `<休整期结束时>场上每有一名不同等阶的维多利亚干员，使自身已激活的盟约层数+${n}`,
+      `<休整期结束时>场上每有一名不同等阶的维多利亚干员，使已激活的自身盟约层数<@ba.vup>+${n}</>`,
+      'SERVER_PREP_FIN', 'SERVER_ADD_BOND_METHOD', 'SERVER_ADD_BOND_METHOD', null, { multi: n },
+      { garrison_key: g(912), add_method: 'same_bond_diff_lv', bond: 'victoriaShip', bond_type: 'bond_self', conditionkey: 'character_target_inboard' });
+  };
+  makoto('garrison_900_a', 5); makoto('garrison_900_b', 10);
+  oblvns('garrison_901_a', 10); oblvns('garrison_901_b', 20);
+  clemnt('garrison_902_a', 6); clemnt('garrison_902_b', 12);
+  narant('a', 3); narant('b', 6);
+  ascln('a', 3); ascln('b', 6);
+  hsgma2('garrison_908_a', 50); hsgma2('garrison_908_b', 100);
+  wang('a', 10); wang('b', 20);
+  jesca2('a', 10); jesca2('b', 20);
   return out;
 }
 /**
@@ -753,14 +840,19 @@ function buildBackups(ctx, chess) {
       for (const k of ['nationId', 'groupId', 'teamId']) if (p?.[k] && !powers.includes(p[k])) powers.push(p[k]);
     }
     const hit = coreBonds.filter((b) => b.powerIdList.some((x) => powers.includes(x))).map((b) => b.bondId);
-    // DIY_BOND_OVERRIDES (the owner's decision of 2026-10-27) replaces the derived set for a hand-designed pick.
+    // DIY_BOND_OVERRIDES / DIY_GARRISON_IDS (the owner's decisions of 2026-10-27 / 2026-10-28): a normal room uses the
+    // derived set and no 特质; an experimental room (experimental.customDiy) uses the hand-designed `custom` set.
     const override = DIY_BOND_OVERRIDES[id];
+    const custom = override ? {
+      bonds: [...override],
+      ...(DIY_GARRISON_IDS[id]
+        ? { garrisons: { normal: [...DIY_GARRISON_IDS[id].normal], elite: [...DIY_GARRISON_IDS[id].elite] } }
+        : null),
+    } : null;
     operators[id] = {
       name: ch.name, rarity: rarityOf(ch), profession: ch.profession, subProfessionId: ch.subProfessionId,
-      obtainable: !ch.isNotObtainable, powers, bonds: override ? [...override] : (hit.length ? hit : [fallback]),
-      ...(DIY_GARRISON_IDS[id]
-        ? { garrisons: { normal: [DIY_GARRISON_IDS[id].normal], elite: [DIY_GARRISON_IDS[id].elite] } }
-        : null),
+      obtainable: !ch.isNotObtainable, powers, bonds: hit.length ? hit : [fallback],
+      ...(custom ? { custom } : null),
     };
   }
   return { units, tokens, diy: { slots, prototypes, locked, ownedPool, excluded, operators } };
