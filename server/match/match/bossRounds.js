@@ -52,7 +52,7 @@ export class MatchBoss {
     // rounds, so it would credit the Final Assault's damage to the hidden leader ("隐藏boss还没打就出了50%播报").
     const hitSteps = new Map();
     if (!hidden) this.finalAliveCount = alive.length;
-    const pool = new SharedBossPool(bossPoolHp(this.gd, bossId, alive.length, { experimental: this.capacityExperiment }), {
+    const pool = new SharedBossPool(bossPoolHp(this.gd, bossId, alive.length, { experimental: this.capacityExperiment, bossHpMul: this.bossHpMul }), {
       onHit: (pid, dmg) => {
         const ps = this.players.get(pid);
         if (!ps) return;

@@ -469,6 +469,8 @@ export class Match {
     this.capacityExperiment = !this.isSolo && this.playerCapacity > 4;
     this.twentyPlayerMode = this.capacityExperiment && this.playerCapacity === 20;
     this.disableDuckLord = this.capacityExperiment && this.experimental.disableDuckLord === true;
+    /** 最终首领血量 (experimental options): R14 Final Assault / R15 Hidden Core pool × 1 / 5 / 10 / 100. */
+    this.bossHpMul = this.experimental.bossHpMul ?? 1;
     this.gd.disableDuckLord = this.disableDuckLord;
     if (opts.seats.length > this.playerCapacity) throw new RangeError('Match: seats exceed room capacity');
     /** SETTLE-only rescue state: { round, eligible: Set<playerId>, windowOpen, deadline }. */

@@ -907,6 +907,8 @@
 .experimental-capacity select:focus-visible { outline: 2px solid var(--mint-400); outline-offset: 2px; }
 .experimental-options { display: grid; gap: 8px; }.experimental-option { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 14px 0; border-bottom: 1px solid var(--line); cursor: pointer; }
 .experimental-option > span { display: grid; gap: 7px; }.experimental-option strong { font-size: max(calc(.19 * var(--t)), calc(15px * var(--ui))); color: var(--text-hi); font-weight: 500; }.experimental-option small { color: var(--text-lo); font-size: max(calc(.14 * var(--t)), calc(12px * var(--ui))); line-height: 1.6; }
+.experimental-option select { flex: none; min-height: 40px; min-width: 100px; padding: 8px 12px; background: var(--bg-3); color: var(--text-hi); border: 1px solid var(--line-3); font: inherit; }
+.experimental-option select:focus-visible { outline: 2px solid var(--mint-400); outline-offset: 2px; }
 .experimental-option input { flex: none; appearance: none; width: 36px; height: 20px; border-radius: 10px; border: 1px solid var(--line-3); background: var(--bg-3); cursor: pointer; }
 .experimental-option input::before { content: ''; display: block; width: 14px; height: 14px; margin: 2px; border-radius: 50%; background: var(--text-lo); transition: transform var(--t-fast); }
 .experimental-option input:checked { border-color: var(--mint-700); background: var(--bg-2); }.experimental-option input:checked::before { background: var(--mint-400); transform: translateX(16px); }

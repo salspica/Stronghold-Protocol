@@ -38,6 +38,10 @@ Platform additions (implemented): `welcome.{resumed, version}`, `welcome.testMod
 **Fork experimental room rules (2026-10-09, local candidate):** `room.create` may carry the existing nested
 `experimental` object, and `room.setExperimental { experimental }` is the host-only update. Required
 `revivalEnabled` / `disableSharedPool` booleans remain; `playerCapacity` selects 4 / 8 / 12 / 16 / 20.
+`experimental.bossHpMul` is an **optional strict number** ∈ {1, 5, 10, 100} (default 1, canonically omitted at ×1;
+offered in every room, solo and co-op, and host-editable before the match): the shared leader pool of the Final Assault
+(R14) and the Hidden Core (R15) is
+multiplied by it (`server/match/finalAssault.js bossPoolHp` → `Match.bossHpMul`, the room's rule snapshotted at launch).
 `experimental.disableDuckLord` is a new **optional strict boolean**, default false, canonically omitted when false or
 at capacity 4; it is effective only in expanded co-op (`capacityExperiment`). There is no top-level alternative or
 ordinary single-player queue override. The room / party ticket / offer and launched local or cluster match inherit

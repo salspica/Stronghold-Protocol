@@ -2,25 +2,29 @@ import { html, Button, Modal } from './components.js';
 import { t, tc } from '../../../shared/i18n.js';
 import { MAX_SEATS } from '../../../shared/constants.js';
 import { PLAYER_CAPACITIES, isPlayerCapacity, roomCapacity } from '../../../shared/playerCapacity.js';
+import { BOSS_HP_MULTIPLIERS, isBossHpMul } from '../../../shared/experimental.js';
 
 export function experimentalOptions(input) {
   const capacity = roomCapacity('coop', input);
   return { revivalEnabled: input?.revivalEnabled === true, disableSharedPool: input?.disableSharedPool === true,
     ...(capacity > MAX_SEATS && input?.disableDuckLord === true ? { disableDuckLord: true } : {}),
+    ...(isBossHpMul(input?.bossHpMul) && input.bossHpMul > 1 ? { bossHpMul: input.bossHpMul } : {}),
     ...(capacity === MAX_SEATS ? {} : { playerCapacity: capacity }) };
 }
 
 /** Whether any option differs from a standard room's (the room's 实验性选项 button is then marked). */
 export function experimentalChanged(input) {
   const options = experimentalOptions(input);
-  return options.revivalEnabled || options.disableSharedPool || !!options.disableDuckLord || !!options.playerCapacity;
+  return options.revivalEnabled || options.disableSharedPool || !!options.disableDuckLord || !!options.playerCapacity
+    || !!options.bossHpMul;
 }
 
 export function experimentalSummary(input) {
   const options = experimentalOptions(input);
   const summary = t('复活 {0} · 共享卡池 {1}', { 0: options.revivalEnabled ? t('开启') : tc('toggle', '关闭'), 1: options.disableSharedPool ? tc('toggle', '关闭') : t('开启') });
   const rules = options.disableDuckLord ? `${summary} · ${t('禁用鸭爵策略')}` : summary;
-  return options.playerCapacity ? t('{rules} · {n} 人模式', { rules, n: options.playerCapacity }) : rules;
+  const boss = options.bossHpMul ? t('{rules} · 最终首领 ×{n}', { rules, n: options.bossHpMul }) : rules;
+  return options.playerCapacity ? t('{rules} · {n} 人模式', { rules: boss, n: options.playerCapacity }) : boss;
 }
 
 export function ExperimentalSummary({ value }) {
@@ -41,6 +45,12 @@ export function ExperimentalOptions({ open, value, mode = 'coop', source = 'priv
       onChange?.(ordinary);
     } else onChange?.({ ...rules, playerCapacity: next });
   };
+  // 最终首领血量: every room (solo too), ×1 canonically omitted from the DTO
+  const setBossHp = next => {
+    if (!editable || busy || !isBossHpMul(next)) return;
+    const { bossHpMul, ...rules } = options;
+    onChange?.(next > 1 ? { ...rules, bossHpMul: next } : rules);
+  };
   return html`<${Modal} open=${open} title=${t('实验性选项')} micro="EXPERIMENTAL" ariaLabel=${t('实验性选项')} trapFocus=${true}
       class="experimental-modal" onClose=${onClose}
       actions=${html`<${Button} icon="check" onClick=${onClose}>${t('完成')}<//>`}>
@@ -54,6 +64,13 @@ export function ExperimentalOptions({ open, value, mode = 'coop', source = 'priv
         <span><strong>${t('禁用共享卡池')}</strong><small>${t('每位博士使用独立卡池，不再争用同一干员库存。')}</small></span>
         <input id="experimental-pool" type="checkbox" role="switch" checked=${options.disableSharedPool}
           disabled=${!editable || busy} onChange=${e => change('disableSharedPool', e.currentTarget.checked)} />
+      </label>
+      <label class="experimental-option" for="experimental-boss-hp">
+        <span><strong>${t('最终首领血量')}</strong><small>${t('第 14 / 15 回合的首领生命值按所选倍数提高，默认 ×1 保持官方数值。')}</small></span>
+        <select id="experimental-boss-hp" value=${options.bossHpMul ?? 1} disabled=${!editable || busy}
+          onChange=${e => setBossHp(Number(e.currentTarget.value))}>
+          ${BOSS_HP_MULTIPLIERS.map(n => html`<option key=${n} value=${n}>${n === 1 ? t('默认 ×1') : `×${n}`}</option>`)}
+        </select>
       </label>
       ${mode === 'coop' && source !== 'matchmaking' ? html`<label class="experimental-option" for="experimental-multiplayer">
         <span><strong>${t('扩展同盟人数')}</strong><small>${t('可直接开局，或整队匹配相同人数模式的房间。所有成员需更新页面，人数较多时等待与演算时间可能增加。')}</small></span>

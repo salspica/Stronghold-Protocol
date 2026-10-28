@@ -3308,5 +3308,9 @@
   "清空追踪": "Clear tracking",
   "盟约追踪（已追踪 {n} 个）": "Bond tracking ({n} tracked)",
   "选择要追踪的盟约；商店和奖励中属于这些盟约的干员会标记「追踪」。只影响你自己的显示。已追踪 {n} 个。": "Choose the bonds to track. Operators of those bonds in the shop and rewards are marked \"Tracked\". This only affects your own display. {n} tracked.",
-  "剩余{n}张": "{n} left"
+  "剩余{n}张": "{n} left",
+  "最终首领血量": "Final boss HP",
+  "第 14 / 15 回合的首领生命值按所选倍数提高，默认 ×1 保持官方数值。": "Raises the leader HP in rounds 14 and 15 by the chosen multiplier; the default ×1 keeps the official values.",
+  "默认 ×1": "Default ×1",
+  "{rules} · 最终首领 ×{n}": "{rules} · final boss ×{n}"
 }

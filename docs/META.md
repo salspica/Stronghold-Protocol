@@ -781,7 +781,10 @@ Any `choice:` handler whose EffectRef reuses its own key must guard like this (o
   Explicit mode false keeps bloodPoint. Notice 5114's "敌方领袖的总生命值不变" describes mirrored copies sharing the
   pool, not player count; the proportion remains [ASSUMED] (巴哈姆特 12294 gives none). Solo stays ×
   `bossHpScale.solo` (0.25 = one player of four [ASSUMED]); upstream's co-op ×alive / solo ×1 profile remains a
-  supported counterfactual, not this fork's default. Leader HP is never scaled by `enemyScale`; parts and escorts keep
+  supported counterfactual, not this fork's default. The room's 最终首领血量 experimental option (`experimental.bossHpMul`
+  = 5 / 10 / 100, default ×1, every room incl. solo, snapshotted at launch) multiplies this pool for both R14 and R15
+  (`Match.bossHpMul` → `bossPoolHp(..., { bossHpMul })`); it does not change leader ATK, escorts, parts, team LP or the
+  overtime clocks. Leader HP is never scaled by `enemyScale`; parts and escorts keep
   their own HP. The merged team LP loses leaks (`lpr`), the overtime drain
   (the boss level's 120 real-second countdown for all-human teams; `bossTurnHpReduceTime` 150 real seconds only with
   a non-departed AI teammate at fight start. The first deduction follows one complete real second after that threshold;

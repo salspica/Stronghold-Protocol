@@ -257,3 +257,23 @@ test('GameHost validates and forwards experimental options, rejecting incoherent
     assert.throws(() => host.prepare({ ...spec, assignmentId: 'bad-options', ...patch }), error => error.code === 'INVALID_SPEC');
   }
 });
+
+test('room boss-HP multiplier: host-only, snapshot into the match, invalid values rejected', t => {
+  const h = lobbyFixture(t), { owner, members } = h.room(2, { revivalEnabled: false, disableSharedPool: false, bossHpMul: 10 });
+  assert.deepEqual(owner.toState().experimental, { revivalEnabled: false, disableSharedPool: false, bossHpMul: 10 });
+  assert.ok(Object.isFrozen(owner.experimental));
+  h.lobby.ready(members[1], { ready: true });
+  for (const bad of [7, 0, 1.5, '10', 1000]) {
+    assert.equal(h.lobby.setExperimental(members[0], { experimental: { ...opts(), bossHpMul: bad } }).error, ERR.BAD_MSG, String(bad));
+  }
+  assert.equal(h.lobby.setExperimental(members[1], { experimental: { ...opts(), bossHpMul: 100 } }).error, ERR.NOT_HOST);
+  assert.deepEqual(h.lobby.setExperimental(members[0], { experimental: { ...opts(), bossHpMul: 100 } }), { ok: true });
+  assert.equal(owner.seatOf(members[1].playerId).ready, false, 'option change un-readies teammates');
+  assert.equal(owner.experimental.bossHpMul, 100);
+  assert.deepEqual(h.lobby.setExperimental(members[0], { experimental: opts() }), { ok: true });
+  assert.equal(owner.experimental.bossHpMul, undefined, '×1 is dropped');
+  assert.deepEqual(h.lobby.setExperimental(members[0], { experimental: { ...opts(), bossHpMul: 100 } }), { ok: true });
+  h.lobby.ready(members[1], { ready: true });
+  assert.deepEqual(h.lobby.start(members[0]), { ok: true });
+  assert.equal(owner.match.opts.experimental.bossHpMul, 100);
+});
