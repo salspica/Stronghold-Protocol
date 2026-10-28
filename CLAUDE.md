@@ -46,4 +46,7 @@ Read [AGENTS.md](AGENTS.md) for the upstream document index and verification gui
 
 ## Attribution
 
-End commits with `Co-Authored-By: Claude Code <noreply@anthropic.com>` and pull-request descriptions with `🤖 Generated with [Claude Code](https://claude.com/claude-code)` when those actions are authorized.
+Commits in this fork are authored by the repository owner. Do **not** add any AI co-author or generation trailer
+(`Co-Authored-By:`, `Generated with …`, `🤖 …`) to commit messages or pull-request descriptions (the owner's decision of
+2026-10-28: the work here is written with DeepSeek, and GitHub counts such trailers as contributors). The upstream
+`AGENTS.md` "no attribution trailers" rule applies unchanged.
