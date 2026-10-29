@@ -333,6 +333,7 @@ test('DIY: the owned-6★ pool and the faction → bond rule (mainPower + every 
       char_2027_wang: ['yanShip', 'skillfulShip', 'arcaneShip'],
       char_4231_clemnt: ['egirShip', 'indomShip', 'swiftShip', 'raidShip', 'skillfulShip'],
       char_1034_jesca2: ['victoriaShip', 'skillfulShip', 'miraShip'],
+      char_4009_irene: ['egirShip', 'swiftShip', 'raidShip'],
     }[id];
     assert.deepEqual(o.bonds, hit.length ? hit : [config.economy.fallbackBondId], `${id}: derived bonds from powers`);
     // and their 卫戍特质 (tools/build-data.mjs DIY_GARRISON_IDS): none by default, kept under `custom` for a room that asks
@@ -345,6 +346,7 @@ test('DIY: the owned-6★ pool and the faction → bond rule (mainPower + every 
       char_1044_hsgma2: { normal: ['garrison_908_a'], elite: ['garrison_908_b'] },
       char_2027_wang: { normal: ['garrison_909_a', 'garrison_910_a'], elite: ['garrison_909_b', 'garrison_910_b'] },
       char_1034_jesca2: { normal: ['garrison_911_a', 'garrison_912_a'], elite: ['garrison_911_b', 'garrison_912_b'] },
+      char_4009_irene: { normal: ['garrison_913_a'], elite: ['garrison_913_b'] },
     }[id];
     assert.equal(o.garrisons, undefined, `${id}: no default 特质`);
     assert.deepEqual(o.custom?.bonds, hand, `${id}: custom bonds`);

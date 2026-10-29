@@ -102,8 +102,10 @@ export class PlayerViews {
       personalChoice: this.personalChoice ? {
         id: this.personalChoice.id,
         round: this.personalChoice.round,
+        kind: this.personalChoice.kind || 'bounty',
         sourceItemId: this.personalChoice.sourceItemId,
-        cards: this.personalChoice.cards.map((c) => bountyCard(this.gd, c)),
+        cards: this.personalChoice.kind === 'diy' ? this.personalChoice.cards.map((c) => ({ ...c }))
+          : this.personalChoice.cards.map((c) => bountyCard(this.gd, c)),
       } : null,
       shop: {
         level: this.shop.level,
@@ -149,6 +151,9 @@ export class PlayerViews {
       // switched off)
       diy: this.diy,
       diyBanned: this.diyBanned,
+      // the room's 自选干员自定义改动 (experimental.customDiy): the client composes the operator's record with the custom
+      // bonds / 特质 when true (shared/diy.js diyRecordOf `custom`), the derived ones when false
+      customDiy: !!this.m.customDiy,
       // 最终攻势 / 隐秘核心 prep (community report of 2026-10-06, item 51): `{ playerId, side, units }` — the pair partner's
       // board pieces as UnitInfo on its half of the boss field (mirrored on the right half, as the battle places them);
       // the own prep view draws them beside the own half, read-only. Absent otherwise.

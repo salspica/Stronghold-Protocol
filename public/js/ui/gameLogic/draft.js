@@ -103,8 +103,11 @@ export function normalizePersonalChoice(pub, priv, myId) {
   const choice = priv?.personalChoice;
   if (pub?.phase !== PHASE.PREP || !priv || priv.playerId !== myId || priv.alive === false
     || !choice || choice.round !== pub.round) return null;
+  const diy = choice.kind === 'diy';
   return {
-    ...normalizeSp({ family: 'bounty', name: t('教鞭 · 战术特训'), desc: t('请选择一项战术特训'),
+    ...normalizeSp({ family: diy ? 'diy' : 'bounty',
+      name: diy ? t('机变 · 自选干员') : t('教鞭 · 战术特训'),
+      desc: diy ? t('选择一名自选干员获得，玩家之间互不影响') : t('请选择一项战术特训'),
       cards: choice.cards, turn: myId, order: [myId], picks: {} }),
     id: choice.id,
   };

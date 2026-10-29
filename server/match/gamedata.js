@@ -290,7 +290,10 @@ export class GameData {
 
   get refreshPrice() { return Math.max(0, numOr(this.economy.refreshPrice, DEFAULTS.refreshPrice)); }
   get benchSize() { return posIntOr(this.economy.benchSize, DEFAULTS.benchSize); }
-  get tempSize() { return posIntOr(this.economy.tempSize, DEFAULTS.tempSize); }
+  get tempSize() {
+    const n = this.economy.tempSize;
+    return Number.isInteger(n) && n >= 0 ? n : DEFAULTS.tempSize;
+  }
   get deployCap() { return posIntOr(this.economy.deployCap, DEFAULTS.deployCap); }
   get equipPerChess() { return posIntOr(this.economy.equipPerChess, DEFAULTS.equipPerChess); }
   get maxArtsPerRound() { return posIntOr(this.economy.maxArtsPerRound, DEFAULTS.maxArtsPerRound); }

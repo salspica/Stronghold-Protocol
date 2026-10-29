@@ -71,6 +71,7 @@
 // Hooks registered only when a bond needs them. Priorities: `hit` −20 (坚守 redirect, after other modifiers had their
 // say), `death` 10 (不屈, the bond slot of the revive/redeploy convention); everything else 0.
 
+import { experimentalLinear } from '../../../../shared/constants.js';
 import { canTargetEnemy, enemyStealthed, extendedGrid } from '../../../targeting.js';
 import { normDir, rotateOffset, localOrder, localBefore } from '../../../dir.js';
 import { bodyKeys, bodyInRange } from '../../../body.js';
@@ -136,7 +137,7 @@ function applyPassives(battle, st) {
   if (t[ID.preci]) {
     const bb = st.bb[ID.preci];
     const wide = t[ID.preci] >= 2;
-    const mods = directMods({ atk: num(bb.base_atk) + num(bb.atk_per_stack) * L(battle, st, ID.preci) });
+    const mods = directMods({ atk: experimentalLinear(num(bb.base_atk), num(bb.atk_per_stack), L(battle, st, ID.preci), 25) });
     if (wide) { mods.defIgnorePct = num(bb.power_def_penetrate); mods.resIgnorePct = num(bb.power_magic_resist_penetrate); }
     for (const u of st.ops) {
       if (st.members[ID.preci].has(u) || (wide && u.def?.position === 'RANGED')) passiveBuff(battle, u, KEY.preci, mods);
@@ -144,12 +145,12 @@ function applyPassives(battle, st) {
   }
   if (t[ID.stead]) {
     const bb = st.bb[ID.stead];
-    const mods = directMods({ hp: num(bb.base_max_hp) + num(bb.max_hp_per_stack) * L(battle, st, ID.stead) });
+    const mods = directMods({ hp: experimentalLinear(num(bb.base_max_hp), num(bb.max_hp_per_stack), L(battle, st, ID.stead), 25) });
     for (const u of st.ops) passiveBuff(battle, u, KEY.stead, mods);
   }
   if (t[ID.deput]) {
     const bb = st.bb[ID.deput];
-    const mods = directMods({ def: num(bb.base_def) + num(bb.def_per_stack) * L(battle, st, ID.deput) }, { redeployMul: Math.max(0, 1 + num(bb.respawn_time)) });
+    const mods = directMods({ def: experimentalLinear(num(bb.base_def), num(bb.def_per_stack), L(battle, st, ID.deput), 25) }, { redeployMul: Math.max(0, 1 + num(bb.respawn_time)) });
     for (const u of st.ops) passiveBuff(battle, u, KEY.deput, mods);
   }
   if (t[ID.raid]) {
@@ -169,14 +170,14 @@ function applyPassives(battle, st) {
   }
   if (t[ID.arcane]) {
     const bb = st.bb[ID.arcane];
-    const m = num(bb.base_damage_scale, 1) + num(bb.damage_scale_per_stack) * L(battle, st, ID.arcane);
+    const m = experimentalLinear(num(bb.base_damage_scale, 1), num(bb.damage_scale_per_stack), L(battle, st, ID.arcane), 22);
     st.arcaneMul = Math.max(0, m);
     st.arcaneLowMul = Math.max(0, m * num(bb.power_weak_scale, 1));
   }
   if (t[ID.skillful]) {
     const bb = st.bb[ID.skillful];
     const lv = L(battle, st, ID.skillful);
-    const v = num(bb.base_attack_speed) + num(bb.attack_speed_per_stack) * lv;
+    const v = experimentalLinear(num(bb.base_attack_speed), num(bb.attack_speed_per_stack), lv, 1500);
     if (!st.auraMods || st.auraMods.aspd !== v) st.auraMods = { aspd: v };
     st.auraWide = lv >= num(bb.power_bond_stack_cnt, Infinity);
   }
@@ -184,10 +185,10 @@ function applyPassives(battle, st) {
 
 function raidMods(bb, lv) {
   const mods = directMods({
-    atk: num(bb.base_atk) + num(bb.atk_per_stack) * lv,
-    hp: num(bb.base_max_hp) + num(bb.max_hp_per_stack) * lv,
+    atk: experimentalLinear(num(bb.base_atk), num(bb.atk_per_stack), lv, 20),
+    hp: experimentalLinear(num(bb.base_max_hp), num(bb.max_hp_per_stack), lv, 20),
   });
-  const aspd = num(bb.base_attack_speed) + num(bb.attack_speed_per_stack) * lv;
+  const aspd = experimentalLinear(num(bb.base_attack_speed), num(bb.attack_speed_per_stack), lv, 1500);
   if (aspd) mods.aspd = aspd;
   return mods;
 }
@@ -658,7 +659,7 @@ export function install(battle) {
         // "伤害来源受到(850+10×L)点法术伤害": 无来源 (no attacker multipliers, hooks see no source) but credited to the
         // member hit — its player's stats and shared-pool tally count it, like an element burst (v2.5: no credit at all,
         // up to 19 % of a co-op leader's pool and 88 % of a solo one went unattributed, DESIGN §20.10)
-        const d = battle.makeDamage({ amount: num(bb.base_damage_value) + num(bb.damage_value_per_stack) * L(battle, st, ID.stead), type: 'arts', canDodge: false, sourceless: true });
+        const d = battle.makeDamage({ amount: experimentalLinear(num(bb.base_damage_value), num(bb.damage_value_per_stack), L(battle, st, ID.stead), 30000) * L(battle, st, ID.stead), type: 'arts', canDodge: false, sourceless: true });
         d.steadThorn = true;
         battle.dealDamage(t, src, d);
         if (src.alive) battle.applyStatus(src, 'fragile', { duration: num(bb['weak[limit]'], 5), value: num(bb.damage_scale, 1) - 1, source: t });

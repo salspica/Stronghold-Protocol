@@ -158,7 +158,7 @@ export function kjeragColdWind(battle, playerId, bb = {}, { bondId = 'kjeragShip
   const base = num(bb['bond_eff_kjerag[storm].base_time'], 0);
   const per = num(bb['bond_eff_kjerag[storm].time_per_stack'], 0);
   const layers = () => num(battle.getPlayer(playerId)?.bonds?.[bondId]?.layers, 0);
-  return startColdWind(battle, { playerId, interval, duration: () => base + per * layers() });
+  return startColdWind(battle, { playerId, interval, duration: () => Math.min(120, base + per * layers()) });
 }
 
 // ---------------------------------------------------------------------------------------------------------------

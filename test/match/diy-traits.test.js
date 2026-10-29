@@ -15,6 +15,7 @@ const ASCLN = 'char_4132_ascln';
 const HSGMA2 = 'char_1044_hsgma2';
 const WANG = 'char_2027_wang';
 const JESCA2 = 'char_1034_jesca2';
+const IRENE = 'char_4009_irene';
 const B = (layers = 0) => ({ count: 3, active: true, tier: 1, layers });
 
 function solo() {
@@ -107,6 +108,22 @@ test('斩业星熊: 被击倒时自身盟约 +50（精锐 +100）', REAL, () => 
     b.b.dealDamage(null, u, { amount: 1e9, type: 'true' });
     b.step(1);
     assert.deepEqual(b.result().perPlayer.p1.layerGains, { kazimierzShip: want, indomShip: want, raidShip: want, preciShip: want });
+    checkBattle(b.b);
+  }
+});
+
+test('艾丽妮: 被击倒时自身盟约 +30（精锐 +60）', REAL, () => {
+  for (const [elite, want] of [[false, 30], [true, 60]]) {
+    const b = makeBattle({ customDiy: true,
+      autoFinish: false, timeLimit: 200, seed: 3,
+      bonds: { egirShip: B(), swiftShip: B(), raidShip: B() },
+      units: [{ uid: 1, diy: { slot: 5, charId: IRENE, skillIndex: 0 }, elite, row: 10, col: 5 }],
+    });
+    b.step();
+    const u = b.unit(1);
+    b.b.dealDamage(null, u, { amount: 1e9, type: 'true' });
+    b.step(1);
+    assert.deepEqual(b.result().perPlayer.p1.layerGains, { egirShip: want, swiftShip: want, raidShip: want });
     checkBattle(b.b);
   }
 });

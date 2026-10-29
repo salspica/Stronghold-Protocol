@@ -9,6 +9,7 @@ import { chessAvatarUrl } from './assetUrls.js';
 import { data, getChess, useData } from '../data.js';
 import { t } from '../../../shared/i18n.js';
 import { appearanceRecord } from './skinAssets.js';
+import { diyRecordFor } from './gameLogic/diy.js';
 
 export function damageNumber(value) {
   const n = Number.isFinite(value) && value > 0 ? value : 0;
@@ -38,6 +39,7 @@ export function damageRows(snapshot, ownerId, metric = 'damage') {
   const rows = (Array.isArray(owner.operators) ? owner.operators : [])
     .filter(row => row && Number.isFinite(row.damage) && row.damage >= 0)
     .map((row, i) => ({ key: typeof row.key === 'string' ? row.key : `uid:${row.uid}:${i}`, uid: row.uid, defId: row.defId,
+      diy: row.diy && typeof row.diy === 'object' ? row.diy : null,
       damage: row.damage, healing: amount(row.healing), other: false }));
   if (amount(owner.otherDamage) || amount(owner.otherHealing)) {
     rows.push({ key: 'other', uid: null, defId: null, damage: amount(owner.otherDamage), healing: amount(owner.otherHealing), other: true });
@@ -164,7 +166,10 @@ function DamageRows({ score = { available: false, rows: [], total: 0 }, manifest
   const healing = metric === 'healing';
   return html`<ol class="damage-board__rows">
     ${score.rows.length ? score.rows.map((row, index) => {
-      const chess = row.other ? null : damageAppearance(getChess(row.defId), row, score.playerId, units);
+      const baseChess = row.other ? null : getChess(row.defId);
+      // 自选: a DIY slot row shows the operator and its custom record (damageBoard carries the pick, `custom` included)
+      const diy = row.diy && baseChess ? diyRecordFor(baseChess, row.diy, { chess: data.get('chess'), backups: data.get('backups') }) : null;
+      const chess = row.other ? null : damageAppearance(diy || baseChess, row, score.playerId, units);
       const name = row.other ? t('装置 / 其他') : chess?.name || row.defId || t('干员');
       const value = healing ? row.healing : row.damage;
       const share = damageShare(value, score.total);

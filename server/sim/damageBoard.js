@@ -36,7 +36,14 @@ export function damageRows(battle) {
       const key = operatorDamageKey(ps.playerId, u.uid, u.id);
       if (!metadata.has(key)) {
         const input = u.uid == null ? null : ps.input?.units?.find((p) => p.uid === u.uid && p.kind !== 'token');
-        metadata.set(key, { key, uid: u.uid ?? null, defId: input?.chessId ?? u.defId ?? null });
+        const diy = input?.diy ?? u.def?.loadout?.diy ?? null;
+        metadata.set(key, { key, uid: u.uid ?? null, defId: input?.chessId ?? u.defId ?? null,
+          ...(diy && typeof diy.charId === 'string' ? { diy: {
+            charId: diy.charId,
+            ...(Number.isInteger(diy.skillIndex) ? { skillIndex: diy.skillIndex } : null),
+            ...(typeof diy.uniEquipId === 'string' ? { uniEquipId: diy.uniEquipId } : null),
+            ...(diy.custom === true ? { custom: true } : null),
+          } } : null) });
       }
     }
     rows.set(ps.playerId, { playerId: ps.playerId, total: damage(battle._perPlayer?.[ps.playerId]?.damageDealt),
@@ -62,7 +69,12 @@ export function damageRows(battle) {
 export function emptyDamageRows(spec) {
   return { owners: (spec.players || []).map((p) => ({ playerId: p.playerId, total: 0, healing: 0,
     operators: (p.units || []).filter((u) => u.kind !== 'token').map((u, i) => ({
-      key: operatorDamageKey(p.playerId, u.uid, `input:${i}`), uid: u.uid ?? null, defId: u.chessId ?? null, damage: 0, healing: 0,
+      key: operatorDamageKey(p.playerId, u.uid, `input:${i}`), uid: u.uid ?? null, defId: u.chessId ?? null,
+      ...(u.diy && typeof u.diy.charId === 'string' ? { diy: { charId: u.diy.charId,
+        ...(Number.isInteger(u.diy.skillIndex) ? { skillIndex: u.diy.skillIndex } : null),
+        ...(typeof u.diy.uniEquipId === 'string' ? { uniEquipId: u.diy.uniEquipId } : null),
+        ...(u.diy.custom === true ? { custom: true } : null) } } : null),
+      damage: 0, healing: 0,
     })), otherDamage: 0, otherHealing: 0 })) };
 }
 

@@ -138,7 +138,7 @@
 // The helpers live in public/js/render/app/*.js and are re-exported below, so existing imports keep
 // working. createFieldView stays here: it is one closure over the view's own state.
 
-import { GEO, ANIM } from '../../../shared/constants.js';
+import { GEO, handSlotPos, ANIM } from '../../../shared/constants.js';
 import { skinIdFor } from '../../../shared/skins.js';
 import { fxForm } from '../../../shared/protocol.js';
 import { Camera, presetCamera, lerpCamera, easeInOutCubic, pickTile, normRect } from './projection.js';
@@ -857,7 +857,7 @@ export async function createFieldView(host, options = {}) {
     const addList = (arr, area) => {
       if (!Array.isArray(arr)) return;
       arr.forEach((pc, i) => {
-        if (area === 'temp' && i >= GEO.TEMP_SIZE) return; // Hidden overflow waits for a visible slot.
+        if (area === 'temp') return; // the five cells are regular hand slots now; overflow waits unseen
         if (!pc || typeof pc !== 'object' || !Number.isInteger(pc.uid)) return;
         if (area === 'board') {
           if (!Number.isInteger(pc.row) || !Number.isInteger(pc.col)) return;
@@ -1292,7 +1292,8 @@ export async function createFieldView(host, options = {}) {
       try { if (fn(piece, r, c, { area: 'board', row: r, col: c })) out.push([r, c]); } catch { /* illegal */ }
     }
     for (let i = 0; i < GEO.HAND_SIZE; i++) {
-      try { if (fn(piece, GEO.HAND_ROW, i, { area: 'hand', idx: i })) out.push([GEO.HAND_ROW, i]); } catch { /* illegal */ }
+      const pos = handSlotPos(i);
+      try { if (fn(piece, pos.row, pos.col, { area: 'hand', idx: i })) out.push([pos.row, pos.col]); } catch { /* illegal */ }
     }
     return out;
   }
@@ -1334,8 +1335,8 @@ export async function createFieldView(host, options = {}) {
     }
     // the drop target (p.target, highlighted) is the tile under the pointer
     if (p.target && p.target.area !== 'temp') {
-      const r = p.target.area === 'board' ? p.target.row : GEO.HAND_ROW;
-      const c = p.target.area === 'board' ? p.target.col : p.target.idx;
+      const pos = p.target.area === 'board' ? { row: p.target.row, col: p.target.col } : handSlotPos(p.target.idx);
+      const r = pos.row, c = pos.col;
       drawHighlight([[r, c]], p.legal ? 'target' : 'illegal', 'dragTarget');
     } else clearHl('dragTarget');
   }
@@ -1346,7 +1347,7 @@ export async function createFieldView(host, options = {}) {
     v._follow = null;
     const t = p.target;
     if (t && (t.area === 'board' || t.area === 'hand')) {
-      const row = t.area === 'board' ? t.row : GEO.HAND_ROW, col = t.area === 'board' ? t.col : t.idx;
+      const { row, col } = t.area === 'board' ? { row: t.row, col: t.col } : handSlotPos(t.idx);
       const w = boardWorld(row, col, t.area === 'hand');
       v._tween = { fx: v.x, fy: v.y, fz: v.z, tx: w.x, ty: w.y, tz: w.z, t: 0 };
       pending.set(dragState.key, { t: performance.now(), view: v, board: t.area === 'board' ? { row, col } : null });

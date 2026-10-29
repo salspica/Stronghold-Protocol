@@ -68,10 +68,19 @@ export const GEO = Object.freeze({
   NORMAL_RECT: { r0: 9, r1: 12, c0: 0, c1: 10 },  // simulation rect for a normal battle
   UNITE_RECT: { r0: 9, r1: 12, c0: 0, c1: 20 },
   BOSS_RECT: { r0: 0, r1: 5, c0: 0, c1: 20 },
-  HAND_ROW: 7, HAND_SIZE: 10,                      // hand slot idx = col 0..9
-  TEMP_ROW: 8, TEMP_C0: 4, TEMP_SIZE: 5,           // temp slot idx 0..4 = cols 4..8
+  HAND_ROW: 7, HAND_SIZE: 15,                      // 10 regular slots on row 7 + 5 on row 8 (the old 临时整备区)
+  HAND_TOP_ROW: 8, HAND_TOP_C0: 4, HAND_TOP_SIZE: 5,
+  TEMP_ROW: 8, TEMP_C0: 4, TEMP_SIZE: 5,           // hidden overflow queue (the five cells are regular hand slots now)
   PARTNER_COL_OFFSET: 8,
 });
+
+/** Board tile of hand slot `i` (0..HAND_SIZE-1): cols 0..9 on row 7, then cols 4..8 on row 8. */
+export const handSlotPos = (i) => (i < 10 ? { row: GEO.HAND_ROW, col: i }
+  : { row: GEO.HAND_TOP_ROW, col: GEO.HAND_TOP_C0 + i - 10 });
+/** Hand slot index of a board tile, or null when the tile is not a hand slot. */
+export const handSlotAt = (row, col) => (row === GEO.HAND_ROW && col >= 0 && col < 10 ? col
+  : row === GEO.HAND_TOP_ROW && col >= GEO.HAND_TOP_C0 && col < GEO.HAND_TOP_C0 + GEO.HAND_TOP_SIZE
+    ? 10 + col - GEO.HAND_TOP_C0 : null);
 
 export const AREA = Object.freeze({ BOARD: 'board', HAND: 'hand', TEMP: 'temp', OUTSIDE: 'outside' });
 
@@ -102,17 +111,27 @@ export const SKILL_SUMMON_START_DEPLOY = true;
  * per N layers (远见, 奇迹, 维多利亚 …) stop with the count. 0 / Infinity = no cap.
  */
 export const BOND_LAYER_CAP = 999;
+/** The custom-DIY experimental room's cap (experimental.customDiy): the same bonds may stack to 9999 there. */
+export const EXPERIMENTAL_BOND_LAYER_CAP = 9999;
+export const bondLayerCapFor = (customDiy) => (customDiy === true ? EXPERIMENTAL_BOND_LAYER_CAP : BOND_LAYER_CAP);
 
 /**
  * The layers a gain of `n` actually adds to a bond holding `before` under BOND_LAYER_CAP: min(n, cap − before), never
  * negative (a count already at or over the cap gains 0 and is never lowered); 0 for a non-positive / non-finite `n`
  * except +Infinity (= "the room left").
  */
-export function layerGainRoom(before, n) {
+export function layerGainRoom(before, n, cap = BOND_LAYER_CAP) {
   if (!(n > 0)) return 0;
-  const cap = BOND_LAYER_CAP > 0 ? BOND_LAYER_CAP : Infinity;
+  const c = cap > 0 ? cap : Infinity;
   const b = Number.isFinite(before) && before > 0 ? before : 0;
-  return Math.max(0, Math.min(n, cap - b));
+  return Math.max(0, Math.min(n, c - b));
+}
+
+/** A stackable bond's linear value, unchanged through 999 and reaching `target` at 9999. */
+export function experimentalLinear(base, per, layers, target) {
+  if (!(layers > 999)) return base + per * layers;
+  const at999 = base + per * 999;
+  return target <= at999 ? at999 : at999 + (target - at999) * (layers - 999) / 9000;
 }
 
 /**

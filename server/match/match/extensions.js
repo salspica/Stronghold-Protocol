@@ -213,7 +213,7 @@ export class MatchExtensions {
   }
 
   _remoteField(opts, players) {
-    const spec = buildBattleSpec({ ...opts, content: this.battleContent,
+    const spec = buildBattleSpec({ ...opts, content: this.battleContent, bondLayerCap: this.bondLayerCap,
       boss: this.bossPool ? { poolHp: this.bossPool.hp, poolMax: this.bossPool.maxHp } : null });
     return { remote: true, fieldId: spec.fieldId, kind: spec.kind, players, spec, battle: new RemoteBattle(spec), live: true };
   }

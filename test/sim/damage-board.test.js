@@ -161,3 +161,16 @@ test('fieldMeta sides come from actual halves even when the first unite helper i
   assert.deepEqual(meta.sides, { rightFirst: 'R', leftSecond: 'L' });
   assert.equal(Object.hasOwn(h.b.result(), 'damageRows'), false, 'trial/default result shape unchanged');
 });
+
+test('a 自选 operator row carries its pick and custom flag (stats menu name / avatar)', () => {
+  const h = makeBattle({ customDiy: true, defs, content: 'none', autoFinish: false, devices: false,
+    units: [{ uid: 21, diy: { slot: 5, charId: 'char_4231_clemnt', skillIndex: 0 }, row: 9, col: 3 }],
+    flags: { dpInit: 99, dpMax: 99 } });
+  h.b.start();
+  const u = h.unit(21), e = h.spawn('score_dummy', { pos: [10, 8] });
+  hit(h.b, u, e, 25);
+  const op = h.b.damageRows().owners[0].operators.find((row) => row.uid === 21);
+  assert.equal(op.defId, 'chess_char_5_diy1_a');
+  assert.deepEqual(op.diy, { charId: 'char_4231_clemnt', skillIndex: 0, custom: true });
+  assert.equal(op.damage, 25);
+});

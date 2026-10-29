@@ -269,7 +269,7 @@ test('config: modes, rounds and templates', () => {
   assert.deepEqual(M.mode_multi_normal.upgradePrices, [5, 8, 11, 12, 13]);
   assert.equal(config.economy.income[1], 4);
   assert.equal(config.economy.income[3], 6);
-  assert.equal(config.economy.benchSize, 10);
+  assert.equal(config.economy.benchSize, 15);
   assert.equal(config.economy.deployCap, 8);
   assert.equal(config.economy.mergeCountOverrides.chess_char_2_11_a, 2);
   assert.equal(config.economy.poolCopiesOverrides.chess_char_2_11_a, 8);

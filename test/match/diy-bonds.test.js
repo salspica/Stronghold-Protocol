@@ -57,6 +57,7 @@ test('the derived bonds of the data: each owned pick its core bonds or 协防, �
     char_2027_wang: ['yanShip', 'skillfulShip', 'arcaneShip'],
     char_4231_clemnt: ['egirShip', 'indomShip', 'swiftShip', 'raidShip', 'skillfulShip'],
     char_1034_jesca2: ['victoriaShip', 'skillfulShip', 'miraShip'],
+    char_4009_irene: ['egirShip', 'swiftShip', 'raidShip'],
   };
   for (const id of owned) {
     const b = OPS[id].bonds;
@@ -81,6 +82,7 @@ test('the derived bonds of the data: each owned pick its core bonds or 协防, �
     char_1044_hsgma2: { normal: ['garrison_908_a'], elite: ['garrison_908_b'] },
     char_2027_wang: { normal: ['garrison_909_a', 'garrison_910_a'], elite: ['garrison_909_b', 'garrison_910_b'] },
     char_1034_jesca2: { normal: ['garrison_911_a', 'garrison_912_a'], elite: ['garrison_911_b', 'garrison_912_b'] },
+    char_4009_irene: { normal: ['garrison_913_a'], elite: ['garrison_913_b'] },
   };
   for (const [id, g] of Object.entries(OPS)) {
     assert.equal(g.garrisons, undefined, `${id}: no default 特质`);
@@ -99,6 +101,27 @@ test('normal room: the eight keep their derived bonds and no 特质; customDiy: 
   assert.deepEqual(b._diyRecords.get(T5A).garrisonIds, ['garrison_900_a'], 'custom 特质');
   deploy(custom, b, T5A);
   assert.equal(b.battleInput().units.find((u) => u.diy)?.diy.custom, true, 'battle input carries the flag');
+});
+
+test('a room seat with customDiy composes the custom record at match start and its prep trait fires', REAL, () => {
+  const seats = [{ seat: 0, playerId: 'p_0', name: 'P0', isBot: false, connected: true,
+    diy: { [T5A]: { charId: 'char_4182_oblvns', skillIndex: 0 } } }];
+  const h = makeMatch({ mode: 'solo', seats, seed: 21,
+    experimental: { revivalEnabled: false, disableSharedPool: false, customDiy: true } }).start();
+  h.toPrep(1);
+  const p0 = h.ps('p_0');
+  p0.bandId = null;
+  const rec = p0.gd.chess(T5A);
+  assert.deepEqual(rec.bonds, ['siracusaShip', 'swiftShip', 'arcaneShip'], 'custom bonds');
+  assert.deepEqual(rec.garrisonIds, ['garrison_901_a'], 'custom 特质');
+  assert.equal(p0.privateView().customDiy, true, 'the client learns the flag');
+  deploy(h, p0, T5A);
+  for (const b of ['siracusaShip', 'swiftShip', 'arcaneShip']) p0.bondCountBonus[b] = 20;
+  p0.recompute();
+  p0.layers = {};
+  p0.round.refreshes = 2;
+  h.m.dispatch(p0, 'onPrepEnd', { round: h.m.round });
+  for (const b of ['siracusaShip', 'swiftShip', 'arcaneShip']) assert.ok(p0.layers[b] >= 10, `${b}: the custom 特质 added at least 10`);
 });
 
 test('煌 counts for 炎 and 维多利亚; its normal and elite copies count once; views and the battle input agree', REAL, () => {

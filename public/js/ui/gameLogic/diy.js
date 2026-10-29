@@ -43,17 +43,19 @@ const CACHE = new WeakMap();
  * @param {any} chess the slot's own chess.json record @param {any} pick `{ charId, skillIndex, uniEquipId }`
  * @param {{ chess?: any, backups?: any }} data
  */
-export function diyRecordFor(chess, pick, data) {
+export function diyRecordFor(chess, pick, data, custom = null) {
   if (!isObj(chess) || !chess.isDiy) return null;
   if (chess.diyFor) return chess; // already composed
   if (!isObj(pick) || !isObj(data?.backups)) return null;
   let m = CACHE.get(data.backups);
   if (!m) { m = new Map(); CACHE.set(data.backups, m); }
   const pot = Number.isInteger(pick.potential) ? pick.potential : null;
-  const key = `${chess.chessId}|${pick.charId}|${pick.skillIndex ?? ''}|${pick.uniEquipId ?? ''}|${pot ?? ''}`;
+  // the room's 自选干员自定义改动: a pick from another player's unit says so itself; the own one via m.private.customDiy
+  const useCustom = typeof custom === 'boolean' ? custom : pick.custom === true;
+  const key = `${chess.chessId}|${pick.charId}|${pick.skillIndex ?? ''}|${pick.uniEquipId ?? ''}|${pot ?? ''}|${useCustom ? 'c' : 'd'}`;
   if (m.has(key)) return m.get(key);
   let rec;
-  try { rec = diyRecordOf(chess, pick, data, { potential: pot }); } catch { rec = null; }
+  try { rec = diyRecordOf(chess, pick, data, { potential: pot, custom: useCustom }); } catch { rec = null; }
   m.set(key, rec);
   return rec;
 }
@@ -61,7 +63,7 @@ export function diyRecordFor(chess, pick, data) {
 /** The record the player's own piece / card of `chess` shows: its 自选 record (own pick), or null. */
 export function ownDiyRecord(chess, priv, data) {
   const pick = ownDiyPick(priv, chess);
-  return pick ? diyRecordFor(chess, pick, data) : null;
+  return pick ? diyRecordFor(chess, pick, data, !!priv?.customDiy) : null;
 }
 
 /**

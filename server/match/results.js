@@ -99,7 +99,8 @@ export function buildResult(m, outcome) {
       const e = { id: piece.id, golden: gd.isGolden(piece.id), tier: gd.tierOf(piece.id), row: r, col: c, items: (piece.items || []).map((i) => i.id) };
       // 0.2.0 自选编队: a DIY slot's pick — the result screen names and draws the operator (shared/diy.js diyRecord)
       const pick = typeof ps.diyPickOf === 'function' ? ps.diyPickOf(piece.id) : null;
-      if (pick) e.diy = { charId: pick.charId, skillIndex: pick.skillIndex, uniEquipId: pick.uniEquipId };
+      if (pick) e.diy = { charId: pick.charId, skillIndex: pick.skillIndex, uniEquipId: pick.uniEquipId,
+        ...(ps.m?.customDiy ? { custom: true } : null) };
       // 0.2.0 补位: a chess this player fielded as its stand-in — the result screen draws the stand-in (the owner's recall
       // of the official mode, 2026-10-06); `standInFor` = the replaced operator's charId, like the sim's UnitInfo
       const si = typeof ps.fieldsStandIn === 'function' && ps.fieldsStandIn(piece.id) ? gd.standIn(piece.id) : null;

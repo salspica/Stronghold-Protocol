@@ -139,7 +139,7 @@ export function BondPopup({ bondId, entry, priv, banned = [], onClose, onMember,
   // (自选 pieces are their operators: the own ones by m.private.diy, a watched teammate's by the pick its unit carries)
   const dd = { chess: data.get('chess'), backups: data.get('backups') };
   const getChess = diyGetter((id) => data.lookup('chess', id), priv, dd);
-  const pieceRecord = (p) => (p && p.diy && typeof p.diy === 'object' ? diyRecordFor(data.lookup('chess', p.id), p.diy, dd) : null) || getChess(p.id);
+  const pieceRecord = (p) => (p && p.diy && typeof p.diy === 'object' ? diyRecordFor(data.lookup('chess', p.id), p.diy, dd, p.diy.custom === true || priv?.customDiy === true) : null) || getChess(p.id);
   const members = bondMembers(b, priv, banned, getChess, (id) => data.lookup('items', id), pieceRecord, morphMode);
   // 补位: the stand-in a row shows (a 自选 row is its operator already)
   const rawChess = (id) => data.lookup('chess', id);
@@ -188,6 +188,10 @@ export function BondPopup({ bondId, entry, priv, banned = [], onClose, onMember,
       <h4>${t('当前效果')} ${b.noStack ? null : html`<small class="num">${t('（{layers} 层）', { layers })}</small>`}</h4>
       <${RichText} as="p" text=${formatBondEffect(b, layers)} class="bpop__desc" />
     </section>` : null}
+    ${priv?.customDiy && EXP_BOND_NOTE[bondId] ? html`<section class="bpop__sec bpop__sec--exp">
+      <h4>${t('实验性叠层（上限 9999）')}</h4>
+      <p class="bpop__desc">${t(EXP_BOND_NOTE[bondId])}</p>
+    </section>` : null}
     <section class="bpop__sec">
       <h4>${t('盟约效果')}</h4>
       <${RichText} as="p" text=${b.descRaw || b.desc} class="bpop__desc" />
@@ -224,3 +228,19 @@ export function BondPopup({ bondId, entry, priv, banned = [], onClose, onMember,
     </section>
   </div>`;
 }
+const EXP_BOND_NOTE = {
+  yanShip: '实验性：999 层后攻击倍率封顶 ×20。',
+  sargonShip: '6 萨尔贡：1000 层后最终伤害 ×1→×5；原有 3/6 人效果不变。',
+  victoriaShip: '999 层后每 500 层额外获得 1 把锤子。',
+  kjeragShip: '999 层后对寒冷/冻结伤害封顶 ×20；寒风不再延长。',
+  lateranoShip: '6 拉特兰：1000 层后无视防御 1%→70%；5000 层起全队固定攻击 +2000；3 人弹药效果不变。',
+  egirShip: '999 层后生命倍率封顶 ×20。',
+  siracusaShip: '6 叙拉古：1000 层后真伤概率额外 +0%→+5%；攻速封顶 +1200，持续 432 秒，真伤封顶 100000。',
+  kazimierzShip: '999 层后攻击上限封顶 +2000%。',
+  preciShip: '999 层后攻击倍率封顶 ×25。',
+  skillfulShip: '999 层后攻速封顶 +1500。',
+  arcaneShip: '999 层后法术易伤封顶 ×22（半血约 ×30.8）。',
+  steadShip: '999 层后生命封顶 ×25，反伤封顶 30000。',
+  deputShip: '999 层后防御封顶 ×25。',
+  raidShip: '999 层后攻击/生命封顶 ×20。',
+};

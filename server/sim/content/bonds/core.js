@@ -43,6 +43,7 @@ import { spawnYanyou } from '../tokens.js';
 import { kjeragColdWind } from '../devices.js';
 import * as items from '../items.js';
 import { FORCED_EXIT } from '../../constants.js';
+import { experimentalLinear } from '../../../../shared/constants.js';
 import { msg } from '../../../../shared/i18n.js';
 import { bbCap } from '../../../../shared/plugins/officialBounds.js';
 import { textFinite } from '../../../../shared/plugins/textNumber.js';
@@ -184,7 +185,7 @@ const ownTag = (dmg, tag) => !!dmg && Array.isArray(dmg.tags) && dmg.tags.includ
 function installYan(battle, pid, bb, members) {
   const L = () => S.bondLayers(battle, pid, 'yanShip');
   const apply = () => {
-    const mods = S.directMods({ atk: num(bb.base_atk) + num(bb.atk_per_stack) * L() });
+    const mods = S.directMods({ atk: experimentalLinear(num(bb.base_atk), num(bb.atk_per_stack), L(), 20) });
     for (const u of members) S.passiveBuff(battle, u, 'bond:yan', mods);
   };
   apply();
@@ -231,10 +232,18 @@ function installSargon(battle, pid, bb, members) {
     if (n > 0 && u.alive) battle.addBuff(u, { key: 'bond:sargon:atk', mods: S.directMods({ atk: perAtk * n }) });
     else battle.removeBuff(u, 'bond:sargon:atk');
   };
+  // 6 萨尔贡 in a custom-DIY room: layers 1000…9999 become a final-damage multiplier ×1…×5
+  const applyFinal = () => {
+    const L = S.bondLayers(battle, pid, 'sargonShip');
+    const mul = six && L >= 1000 ? 1 + 4 * (L - 1000) / 8999 : 1;
+    for (const m of members) S.passiveBuff(battle, m, 'bond:sargon:final', { dmgDealtMul: mul });
+  };
+  applyFinal();
+  onLayers(battle, pid, 'sargonShip', applyFinal);
   battle.on('skillStart', ({ unit }) => {
     if (!memberSet.has(unit)) return;
     const L = S.bondLayers(battle, pid, 'sargonShip');
-    const dur = num(main.base_time, 0) + num(main.time_per_stack, 0) * L;
+    const dur = Math.min(225, experimentalLinear(num(main.base_time, 0), num(main.time_per_stack, 0), L, 225));
     if (dur > 0) {
       for (const m of members) {
         if (!S.onField(m)) continue;
@@ -272,7 +281,7 @@ function lendAround(battle, from, share, L) {
 
 function installVictoria(battle, pid, bb, members) {
   const apply = () => {
-    const mul = num(bb.base_damage_scale, 1) + num(bb.damage_scale_per_stack, 0) * S.bondLayers(battle, pid, 'victoriaShip');
+    const mul = experimentalLinear(num(bb.base_damage_scale, 1), num(bb.damage_scale_per_stack, 0), S.bondLayers(battle, pid, 'victoriaShip'), 18);
     for (const u of members) {
       if (S.itemsOf(u).length >= 1) S.passiveBuff(battle, u, 'bond:victoria', { dmgDealtMul: mul });
     }
@@ -302,7 +311,7 @@ function installKjerag(battle, pid, bb, members) {
     if (!isEnemyTarget(t) || !c.dmg) return;
     const f = t.s.flags;
     if (!f.cold && !f.freeze) return;
-    const target = ex + per * S.bondLayers(battle, pid, 'kjeragShip');
+    const target = experimentalLinear(ex, per, S.bondLayers(battle, pid, 'kjeragShip'), 20);
     if (base > 0 && target > 0) c.dmg.mul *= target / base;
   };
   for (const u of members) onUnitHit(battle, u, onHit);
@@ -316,7 +325,7 @@ function installLaterano(battle, pid, bb, members) {
   const memberSet = new Set(members);
   battle.on('skillStart', ({ unit, skill }) => {
     if (!memberSet.has(unit) || !skill || skill.kind !== 'ammo' || !(skill.ammoLeft > 0)) return;
-    const mul = 1 + num(bb.base_ammo_percent, 0) + num(bb.ammo_percent_per_stack, 0) * S.bondLayers(battle, pid, 'lateranoShip');
+    const mul = experimentalLinear(1 + num(bb.base_ammo_percent, 0), num(bb.ammo_percent_per_stack, 0), S.bondLayers(battle, pid, 'lateranoShip'), 22);
     const n = Math.floor(skill.ammoLeft * mul + 1e-9);
     if (Number.isFinite(n) && n > skill.ammoLeft) skill.ammoLeft = n;
   }, { priority: -10 });
@@ -330,6 +339,17 @@ function installLaterano(battle, pid, bb, members) {
     st.bonus = Math.min(cap, st.used * per);
     for (const m of members) S.passiveBuff(battle, m, 'bond:laterano:ammo', S.directMods({ atk: st.bonus }));
   });
+  // 6 拉特兰 in a custom-DIY room: 1000…9999 → ignore 1 %…70 % DEF; at 5000 every member gains +2000 flat ATK
+  const applyExp = () => {
+    const L = S.bondLayers(battle, pid, 'lateranoShip');
+    const pen = L >= 1000 ? 0.01 + 0.69 * (L - 1000) / 8999 : 0;
+    for (const m of members) {
+      S.passiveBuff(battle, m, 'bond:laterano:pen', pen > 0 ? { defIgnorePct: pen } : {});
+      S.passiveBuff(battle, m, 'bond:laterano:flat', L >= 5000 ? { atkFinal: 2000 } : {});
+    }
+  };
+  applyExp();
+  onLayers(battle, pid, 'lateranoShip', applyExp);
 }
 
 // =====================================================================================================================
@@ -478,7 +498,7 @@ function installEgir(battle, pid, bb, members) {
   // stands from 15 layers on, 2904 × 1.50 = 4356). The layers the devour adds raise it one tick later (onLayers; the HP
   // ratio is kept).
   const apply = () => {
-    const mods = S.directMods({ hp: num(bb.base_max_hp, 0) + num(bb.max_hp_per_stack, 0) * S.bondLayers(battle, pid, 'egirShip') });
+    const mods = S.directMods({ hp: experimentalLinear(num(bb.base_max_hp, 0), num(bb.max_hp_per_stack, 0), S.bondLayers(battle, pid, 'egirShip'), 20) });
     for (const u of members) S.passiveBuff(battle, u, 'bond:egir', mods);
   };
   apply();
@@ -581,16 +601,18 @@ function installSiracusa(battle, pid, bb, members) {
   battle.on('deploy', ({ unit }) => {
     if (!memberSet.has(unit)) return;
     const L = S.bondLayers(battle, pid, 'siracusaShip');
-    const dur = num(bb.base_duration, 0) + num(bb.duration_per_stack, 0) * L;
+    const dur = Math.min(432, experimentalLinear(num(bb.base_duration, 0), num(bb.duration_per_stack, 0), L, 432));
     if (!(dur > 0)) return;
-    battle.addBuff(unit, { key: 'bond:siracusa', duration: dur, mods: { aspd: num(bb.base_attack_speed, 0) + num(bb.attack_speed_per_stack, 0) * L } });
+    battle.addBuff(unit, { key: 'bond:siracusa', duration: dur, mods: { aspd: experimentalLinear(num(bb.base_attack_speed, 0), num(bb.attack_speed_per_stack, 0), L, 1200) } });
     if (!six) return;
     unit.mem.siraStealthEnd = Infinity;
     const off = ({ unit: u }) => { u.mem.siraStealthEnd = battle.time; };
     battle.addBuff(unit, { key: 'bond:siracusa:stealth', duration: dur, flags: { stealth: true }, status: 'stealth', onExpire: off, onRemove: off });
   });
   if (!six) return;
-  const c = prdConstant(num(bb.prob, 0));
+  const L6 = S.bondLayers(battle, pid, 'siracusaShip');
+  const extra = L6 >= 1000 ? 0.05 * (L6 - 1000) / 8999 : 0;
+  const c = prdConstant(Math.min(1, num(bb.prob, 0) + extra));
   if (!(c > 0)) return;
   const st = { n: 0 };
   const onDmg = (ctx) => {
@@ -601,7 +623,7 @@ function installSiracusa(battle, pid, bb, members) {
     st.n++;
     if (!(battle.rng() < Math.min(1, c * st.n))) return;
     st.n = 0;
-    const amount = num(bb.base_damage, 0) + num(bb.damage_per_stack, 0) * S.bondLayers(battle, pid, 'siracusaShip');
+    const amount = experimentalLinear(num(bb.base_damage, 0), num(bb.damage_per_stack, 0), S.bondLayers(battle, pid, 'siracusaShip'), 100000);
     S.fxOn(battle, 'bondProc', t, 'bond:siracusaShip', 'assassin', { from: u.id, amount });
     if (amount > 0) battle.dealDamage(u, t, { amount, type: 'true', canDodge: false, tags: ['bond:siracusa'] });
     if (t.alive && num(bb.fear, 0) > 0) battle.applyStatus(t, 'fear', { duration: num(bb.fear, 0), source: u });
@@ -615,7 +637,7 @@ function installSiracusa(battle, pid, bb, members) {
 function installKazimierz(battle, pid, bb, members) {
   const st = { deploys: 0 };
   const apply = () => {
-    const cap = num(bb.base_max_atk_when_born, 0) + num(bb.max_atk_when_born_per_stack, 0) * S.bondLayers(battle, pid, 'kazimierzShip');
+    const cap = experimentalLinear(num(bb.base_max_atk_when_born, 0), num(bb.max_atk_when_born_per_stack, 0), S.bondLayers(battle, pid, 'kazimierzShip'), 20);
     const bonus = Math.max(0, Math.min(cap, st.deploys * num(bb.atk_when_born, 0)));
     if (!(bonus > 0)) return;
     for (const u of members) S.passiveBuff(battle, u, 'bond:kazimierz', S.directMods({ atk: bonus }));
@@ -698,7 +720,9 @@ export function payHammers(ctx) {
   const p = S.buffParams(ctx.data?.bonds?.victoriaShip ?? S.bondRecord('victoriaShip'), VICTORIA_REWARD_KEY);
   const step = Math.floor(num(p?.layer, 0));
   if (!p || !(step > 0)) return 0;
-  const due = Math.floor(ctx.layers('victoriaShip') / step);
+  const layersNow = ctx.layers('victoriaShip');
+  const due = layersNow > 999 ? Math.floor(999 / step) + Math.floor((layersNow - 999) / 500)
+    : Math.floor(layersNow / step);
   // [ASSUMED] DESIGN §32.5: each milestone pays at most the official `count` cap. Official count is 1.
   const count = Math.min(bbCap('count'), Math.max(0, Math.floor(num(p.count, 1))));
   let granted = 0;

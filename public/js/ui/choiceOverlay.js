@@ -23,7 +23,7 @@ import { html, Icon, TierChip, Countdown, Button } from './components.js';
 import { TurnPopup, preloadTurnPopupArt, turnPopupArtReady } from './turnPopup.js';
 import { reducedMotion } from './device.js';
 import { Img, RichText, PlayerAvatar, GIcon } from './gameComponents.js';
-import { itemIconUrl, enemyIconUrl, uiUrl } from './assetUrls.js';
+import { itemIconUrl, enemyIconUrl, uiUrl, chessAvatarUrl } from './assetUrls.js';
 import { richTextPlain } from './richText.js';
 import { sortedPlayers, draftMyTurn } from './gameLogic.js';
 import { data } from '../data.js';
@@ -64,6 +64,10 @@ export function resolveSpCard(card, family) {
   const bounty = byEffect(choices?.cards?.bounty, effectId);
   const tactic = byEffect(choices?.cards?.tactic, effectId);
   const m = data.get('assets');
+  if (card.kind === 'diy') {
+    return { kind: 'diy', name: card.name || t('自选干员'), desc: card.desc || '', team: false,
+      tier: Number.isFinite(card.tier) ? card.tier : 6, icon: chessAvatarUrl(m, { charId: card.charId }) };
+  }
   const kind = card.kind === 'item' || item ? 'item' : card.kind === 'bounty' || bounty || family === 'bounty' ? 'bounty' : 'tactic';
   const enemyKey = card.enemyKey || bounty?.enemyKey || eff?.params?.enemy_id || null;
   const team = card.team ?? tactic?.team ?? (eff?.decoIconId === 'icon_team_buff');
@@ -227,7 +231,7 @@ export function ChoiceView({ pub, sp, myId, solo, personal = false, busyIdx = nu
   // beside the bar; on the right the player deciding (name over 正在决策…, an hourglass) or 当前轮到你决策, then the
   // countdown. The pick order also shows on the team panel (✓ / ••• on the portraits, ui/teamPanel.js spMarks); the
   // strip below keeps each teammate's pick (the fork's, 2026-10)
-  return html`<div class=${cx('spov', armed != null && 'has-armed', personal && 'spov--personal', (sp.cards.length > 6 || order.length > 4) && 'spov--expanded')} data-allow-repeat=${sp.allowRepeat === true ? 'true' : undefined} role="dialog" aria-label=${personal ? t('教鞭选择') : t('机变阶段')} onPointerDown=${onDown}>
+  return html`<div class=${cx('spov', armed != null && 'has-armed', personal && 'spov--personal', (sp.cards.length > 6 || order.length > 4) && 'spov--expanded')} data-allow-repeat=${sp.allowRepeat === true ? 'true' : undefined} role="dialog" aria-label=${personal ? (sp.family === 'diy' ? t('自选干员选择') : t('教鞭选择')) : t('机变阶段')} onPointerDown=${onDown}>
     <div class="spov__veil" aria-hidden="true"></div>
     <div class="spov__inner">
       <header class="spov__head">

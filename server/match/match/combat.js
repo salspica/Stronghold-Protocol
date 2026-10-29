@@ -16,7 +16,7 @@ import { morphBattleOpt } from '../../../shared/plugins/rules.js';
 export class MatchCombat {
   /** Construct a battle; a constructor failure yields a finished stand-in (clean result) and is logged. */
   newBattle(opts, { preview = false } = {}) {
-    const full = { data: this.ds, content: this.battleContent, logger: this.log, ...opts, ...morphBattleOpt(this.rules),
+    const full = { data: this.ds, content: this.battleContent, logger: this.log, ...opts, bondLayerCap: this.bondLayerCap, ...morphBattleOpt(this.rules),
       ...(preview ? { logger: {}, quiet: true } : {}) };
     try {
       return new this.BattleClass(full);
@@ -165,7 +165,7 @@ export class MatchCombat {
       // Advance the watermark before dispatch: rewards can cause nested onGain/onLayers hooks.
       ps.battleLayerGains[bondId] = total;
       const before = ps.layers[bondId] || 0;
-      const add = layerGainRoom(before, total - credited);
+      const add = layerGainRoom(before, total - credited, this.bondLayerCap);
       if (!(add > 0)) continue;
       ps.layers[bondId] = before + add;
       this.dispatch(ps, 'onLayers', { bondId, from: before, to: ps.layers[bondId], reason: 'battle' });

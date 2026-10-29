@@ -334,7 +334,7 @@ export class MatchViews {
   /** A 自选 piece's pick (like the sim's UnitInfo.diy): a scout's card composes the operator from it (shared/diy.js). */
   _diyInfo(ps, piece) {
     const p = piece.kind === 'chess' && typeof ps.diyPickOf === 'function' ? ps.diyPickOf(piece.id) : null;
-    return p ? { charId: p.charId, skillIndex: p.skillIndex, uniEquipId: p.uniEquipId } : undefined;
+    return p ? { charId: p.charId, skillIndex: p.skillIndex, uniEquipId: p.uniEquipId, ...(this.customDiy ? { custom: true } : null) } : undefined;
   }
 
   /** The 外勤医疗 reserve medic already standing on each player's field in preparation. Touch replaces it only at

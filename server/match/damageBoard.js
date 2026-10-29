@@ -66,8 +66,13 @@ export class DamageBoard {
       for (const op of owner.operators) {
         if (typeof op?.key !== 'string' || opKeys.has(op.key) || amount(op.damage) == null || healAmount(op.healing) == null
           || (op.uid != null && !Number.isSafeInteger(op.uid)) || (op.defId != null && typeof op.defId !== 'string')) return false;
+        if (op.diy != null && (typeof op.diy !== 'object' || Array.isArray(op.diy) || typeof op.diy.charId !== 'string')) return false;
         opKeys.add(op.key);
-        operators.push({ key: op.key, uid: op.uid ?? null, defId: op.defId ?? null, damage: op.damage, healing: healAmount(op.healing) });
+        operators.push({ key: op.key, uid: op.uid ?? null, defId: op.defId ?? null, damage: op.damage, healing: healAmount(op.healing),
+          ...(op.diy ? { diy: { charId: op.diy.charId,
+            ...(Number.isInteger(op.diy.skillIndex) ? { skillIndex: op.diy.skillIndex } : null),
+            ...(typeof op.diy.uniEquipId === 'string' ? { uniEquipId: op.diy.uniEquipId } : null),
+            ...(op.diy.custom === true ? { custom: true } : null) } } : null) });
       }
       rows.push({ playerId: owner.playerId, total: owner.total, healing: healAmount(owner.healing), operators,
         otherDamage: owner.otherDamage, otherHealing: healAmount(owner.otherHealing) });

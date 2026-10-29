@@ -25,12 +25,12 @@
 //   pieceDrop      { uid, piece, from, target }
 //   pieceDragEnd   { uid, piece, dropped, cancelled }
 
-import { GEO } from '../../../shared/constants.js';
+import { GEO, handSlotPos, handSlotAt } from '../../../shared/constants.js';
 
 /** Where a piece currently sits, as a tile. `piece.area` 'board' uses row/col; 'hand'/'temp' use idx. */
 export function pieceTile(piece) {
   if (!piece || typeof piece !== 'object') return null;
-  if (piece.area === 'hand' && Number.isInteger(piece.idx)) return { row: GEO.HAND_ROW, col: piece.idx };
+  if (piece.area === 'hand' && Number.isInteger(piece.idx)) return handSlotPos(piece.idx);
   if (piece.area === 'temp' && Number.isInteger(piece.idx)) return { row: GEO.TEMP_ROW, col: GEO.TEMP_C0 + piece.idx };
   if (Number.isInteger(piece.row) && Number.isInteger(piece.col)) return { row: piece.row, col: piece.col };
   return null;
@@ -52,8 +52,8 @@ export function pieceSlot(piece) {
 export function tileSlot(tile, geo = GEO) {
   if (!tile || !Number.isInteger(tile.row) || !Number.isInteger(tile.col)) return null;
   const { row, col } = tile;
-  if (row === geo.HAND_ROW && col >= 0 && col < geo.HAND_SIZE) return { area: 'hand', idx: col };
-  if (row === geo.TEMP_ROW && col >= geo.TEMP_C0 && col < geo.TEMP_C0 + geo.TEMP_SIZE) return { area: 'temp', idx: col - geo.TEMP_C0 };
+  const hi = handSlotAt(row, col); if (hi != null) return { area: 'hand', idx: hi };
+  
   const F = geo.FIELD;
   if (row >= F.r0 && row <= F.r1 && col >= F.c0 && col <= F.c1) return { area: 'board', row, col };
   return null;
@@ -85,8 +85,7 @@ export function resolveDrop(p) {
 export function isLegal(canPlace, piece, slot) {
   if (!slot || slot.area === 'temp' || slot.area === 'outside') return false;
   if (typeof canPlace !== 'function') return true;
-  const row = slot.area === 'board' ? slot.row : GEO.HAND_ROW;
-  const col = slot.area === 'board' ? slot.col : slot.idx;
+  const { row, col } = slot.area === 'board' ? { row: slot.row, col: slot.col } : handSlotPos(slot.idx);
   try { return canPlace(piece, row, col, slot) !== false; } catch { return false; }
 }
 

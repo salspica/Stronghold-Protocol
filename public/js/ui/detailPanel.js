@@ -827,9 +827,14 @@ function resolveDetailBase(target, pieces, { priv = null, backups = data.get('ba
     if (c && typeof u.standInFor === 'string' && u.standInFor) si = standInOf(c, backups);
     else if (c && own?.piece) si = ownSi(c);
     // 0.2.0 自选编队: a unit says itself which operator fills its DIY slot (UnitInfo diy); an own piece's unit follows
-    // m.private.diy like the piece
-    const pick = c && u.diy && typeof u.diy === 'object' ? unitPick(u) : own?.piece ? ownDiyPick(priv, c) : null;
-    const dr = pick ? diyRecordFor(c, pick, dd) : null;
+    // m.private.diy like the piece. The room's experimental.customDiy travels on the pick; a rendered battle unit may
+    // predate that flag, so an own unit also falls back to m.private.customDiy.
+    const mine = !!own?.piece || (typeof u.ownerId === 'string' && priv?.playerId === u.ownerId);
+    const pick = c && u.diy && typeof u.diy === 'object' ? unitPick(u)
+      : mine && c?.isDiy ? ownDiyPick(priv, c) : null;
+    const custom = !!pick && (pick.custom === true || (mine && priv?.customDiy === true)
+      || u.def?.loadout?.diy?.custom === true);
+    const dr = pick ? diyRecordFor(c, pick, dd, custom) : null;
     // 0.2.2: another player's unit says its 潜能 / 练度 itself (UnitInfo potential / cultivate); an own piece's unit follows
     // m.private.ops (the panel's `cultOpts`)
     const cv = own?.piece ? null : { cultOpts: { cultivation: unitCultivation(u) } };

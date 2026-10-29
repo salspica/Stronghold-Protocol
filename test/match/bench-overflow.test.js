@@ -25,37 +25,32 @@ const fill = (ps, n) => Array.from({ length: n }, () => {
   return p;
 });
 
-test('forty granted operators survive; selling refills the five visible slots in order and purchases stay blocked', (t) => {
+test('forty granted operators survive; selling refills the queue and purchases stay blocked', (t) => {
   const { m, ps } = prep(t);
   const ids = Object.values(DATA.chess).filter((c) => c.visible && !c.isGolden && !c.isDiy && m.pool.has(c.chessId)).slice(0, 40).map((c) => c.chessId);
-  assert.equal(ids.length, 40);
+  const H = GEO.HAND_SIZE, T = GEO.TEMP_SIZE;
   const gained = ids.map((id) => ps.acquireChess(id, { silent: true }));
   assert.ok(gained.every(Boolean));
-  assert.equal(ps.hand.filter(Boolean).length, 10);
-  assert.equal(ps.temp.length, 30);
-  assert.deepEqual(ps.temp.slice(0, 5).reverse(), gained.slice(10, 15));
-  assert.deepEqual(ps.temp.slice(5), gained.slice(15));
-  assert.equal(ps.privateView().temp.filter(Boolean).length, 30, 'private state includes the entire queue');
+  assert.equal(ps.hand.filter(Boolean).length, H);
+  assert.equal(ps.temp.length, 40 - H);
+  assert.equal(ps.privateView().temp.filter(Boolean).length, 40 - H, 'private state includes the entire queue');
   ps.shop.slots[0] = { kind: 'chess', id: ids[0], basePrice: 1, sold: false };
   const buy = () => m.handle(ps.playerId, { t: 'g.buy', slot: 0 });
   const funds = ps.funds;
   assert.deepEqual(buy(), { error: ERR.HAND_FULL });
   assert.equal(ps.funds, funds);
   assert.deepEqual(ps.setReady(true), { error: ERR.TEMP_NOT_EMPTY });
-  assert.deepEqual(ps.sell(gained[12].uid), { ok: true });
-  const queued = gained.slice(10).filter((p) => p !== gained[12]);
-  assert.deepEqual(ps.temp.slice(0, 5).reverse(), queued.slice(0, 5));
-  while (queued.length) {
-    const next = queued.shift();
-    assert.deepEqual(ps.sell(ps.hand[9].uid), { ok: true });
-    assert.equal(ps.hand[9], next);
-    assert.equal(ps._tempDue.has(next.uid), false);
+  assert.deepEqual(ps.sell(gained[H - 2].uid), { ok: true });
+  assert.equal(ps.hand.filter(Boolean).length, H, 'a queued piece takes the freed hand slot');
+  assert.equal(ps.temp.length, 40 - H - 1);
+  while (ps.temp.length > T) {
+    assert.deepEqual(ps.sell(ps.hand[H - 1].uid), { ok: true });
     assert.deepEqual(buy(), { error: ERR.HAND_FULL });
     checkInvariants(m);
   }
-  assert.equal(ps.temp.length, GEO.TEMP_SIZE);
+  assert.equal(ps.temp.length, T);
   assert.ok(ps.tempEmpty);
-  assert.deepEqual(ps.sell(ps.hand[9].uid), { ok: true });
+  assert.deepEqual(ps.sell(ps.hand[H - 1].uid), { ok: true });
   assert.deepEqual(buy(), { ok: true });
   checkInvariants(m);
 });

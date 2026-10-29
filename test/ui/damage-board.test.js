@@ -231,3 +231,11 @@ test('伤害 / 治疗: the healing view ranks effective healing, lists only the 
   const old = damageRows({ owners: [{ playerId: 'p0', total: 5, otherDamage: 0, operators: [{ key: 'a', uid: 1, defId: 'x', damage: 5 }] }] }, 'p0', 'healing');
   assert.deepEqual([old.total, old.rows.length, old.seconds], [0, 0, 0]);
 });
+
+test('a 自选 operator row keeps its pick so the stats list composes its name and portrait', () => {
+  const p = packet();
+  p.owners[0].operators[0] = { key: 'op1', uid: 1, defId: 'chess_char_5_diy1_a',
+    diy: { charId: 'char_4231_clemnt', skillIndex: 0, custom: true }, damage: 100 };
+  const rows = damageRows(p, 'p1').rows;
+  assert.deepEqual(rows.find((r) => r.key === 'op1').diy, { charId: 'char_4231_clemnt', skillIndex: 0, custom: true });
+});

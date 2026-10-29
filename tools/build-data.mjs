@@ -548,7 +548,7 @@ const DIY_EXCLUDED_TEAMS = Object.freeze(['rainbow', 'action4', 'mujica', 'sees'
  */
 const DIY_INCLUDED_CHARS = Object.freeze(['char_4182_oblvns', 'char_4217_makoto']);
 /**
- * Hand-designed bond sets for the eight hand-designed picks (the owner's decisions of 2026-10-27 / 2026-10-28): a
+ * Hand-designed bond sets for the nine hand-designed picks (the owner's decisions of 2026-10-27 / 2026-10-28): a
  * deliberate deviation from the "a 自选 piece's bonds come from its factions" rule. Their 奥术 / 迅捷 / 远见 / 奇迹 /
  * 精准 / 突袭 / 灵巧 bonds are add-on bonds whose `powerIdList` is empty, so no derivation could ever reach them; the
  * owner picked the combination instead.
@@ -560,6 +560,7 @@ const DIY_INCLUDED_CHARS = Object.freeze(['char_4182_oblvns', 'char_4217_makoto'
  *   望:       炎 + 灵巧 + 奥术         (yanShip + skillfulShip + arcaneShip)
  *   克莱门莎: 阿戈尔 + 不屈 + 迅捷 + 突袭 + 灵巧 (egirShip + indomShip + swiftShip + raidShip + skillfulShip)
  *   涤火杰西卡: 维多利亚 + 灵巧 + 奇迹  (victoriaShip + skillfulShip + miraShip)
+ *   艾丽妮:   阿戈尔 + 迅捷 + 突袭     (egirShip + swiftShip + raidShip)
  */
 const DIY_BOND_OVERRIDES = Object.freeze({
   char_4217_makoto: Object.freeze(['lateranoShip', 'miraShip', 'visiShip']),
@@ -570,9 +571,10 @@ const DIY_BOND_OVERRIDES = Object.freeze({
   char_2027_wang: Object.freeze(['yanShip', 'skillfulShip', 'arcaneShip']),
   char_4231_clemnt: Object.freeze(['egirShip', 'indomShip', 'swiftShip', 'raidShip', 'skillfulShip']),
   char_1034_jesca2: Object.freeze(['victoriaShip', 'skillfulShip', 'miraShip']),
+  char_4009_irene: Object.freeze(['egirShip', 'swiftShip', 'raidShip']),
 });
 /**
- * 卫戍特质 (garrisons) of those eight picks (the owner's decisions of 2026-10-27 evening / 2026-10-28). A 自选 piece
+ * 卫戍特质 (garrisons) of those nine picks (the owner's decisions of 2026-10-27 / 2026-10-28). A 自选 piece
  * carries none (PRTS: 甄选加入的干员不会拥有任何特质); these get hand-designed traits, one record per trigger and one record
  * per form so the elite pick gets the higher amount:
  *   结城理   — knock-out or 替身 ⇄ 本体 switch: own active bonds +5 / +10 (act1autochess_gar_event_selfdead, bond_self).
@@ -590,6 +592,7 @@ const DIY_BOND_OVERRIDES = Object.freeze({
  *   涤火杰西卡 — at 休整期开始: one random of 维娜 / 号角 / 烛煌 (SERVER_GAIN_RANDOM_CHESS); at 休整期结束, per
  *              distinct-tier 维多利亚 operator on the field: own active bonds +10 / +20 (SERVER_ADD_BOND_METHOD
  *              same_bond_diff_lv, bond:victoriaShip, bond_self).
+ *   艾丽妮   — in battle, knocked out: own active bonds +30 / +60 (act1autochess_gar_event_selfdead, bond_self).
  * The "自身盟约" traits name the unit's OWN bonds (bond_self), never a fixed list: 变形同构体 + a bond item (转职) adds
  * a bond at runtime and it gains too (support.unitBonds / metaBonds include those grants).
  * data/garrisons.json is generated: change this table, never the JSON.
@@ -603,6 +606,7 @@ const DIY_GARRISON_IDS = Object.freeze({
   char_1044_hsgma2: Object.freeze({ normal: ['garrison_908_a'], elite: ['garrison_908_b'] }),
   char_2027_wang: Object.freeze({ normal: ['garrison_909_a', 'garrison_910_a'], elite: ['garrison_909_b', 'garrison_910_b'] }),
   char_1034_jesca2: Object.freeze({ normal: ['garrison_911_a', 'garrison_912_a'], elite: ['garrison_911_b', 'garrison_912_b'] }),
+  char_4009_irene: Object.freeze({ normal: ['garrison_913_a'], elite: ['garrison_913_b'] }),
 });
 /** The records above, in the shape buildGarrisons emits (DATA.md §4). */
 function buildDiyGarrisons() {
@@ -697,6 +701,12 @@ function buildDiyGarrisons() {
       'SERVER_PREP_FIN', 'SERVER_ADD_BOND_METHOD', 'SERVER_ADD_BOND_METHOD', null, { multi: n },
       { garrison_key: g(912), add_method: 'same_bond_diff_lv', bond: 'victoriaShip', bond_type: 'bond_self', conditionkey: 'character_target_inboard' });
   };
+  const irene = (id, n) => add(id,
+    `<战斗中>自身被击倒时，使已激活的自身盟约层数+${n}`,
+    `<战斗中>自身被击倒时，使已激活的自身盟约层数<@ba.vup>+${n}</>`,
+    'IN_BATTLE', 'ADD_BOND', 'act1autochess_gar_event_selfdead', 'env_gbuff_new_with_verify',
+    { bond_add_count: n },
+    { key: 'act1autochess_gar_event_selfdead', bond_type: 'bond_self', bond_add_type: 'by_count', garrison_key: id });
   makoto('garrison_900_a', 5); makoto('garrison_900_b', 10);
   oblvns('garrison_901_a', 10); oblvns('garrison_901_b', 20);
   clemnt('garrison_902_a', 6); clemnt('garrison_902_b', 12);
@@ -705,6 +715,7 @@ function buildDiyGarrisons() {
   hsgma2('garrison_908_a', 50); hsgma2('garrison_908_b', 100);
   wang('a', 10); wang('b', 20);
   jesca2('a', 10); jesca2('b', 20);
+  irene('garrison_913_a', 30); irene('garrison_913_b', 60);
   return out;
 }
 /**
@@ -3151,7 +3162,7 @@ function buildConfig(ctx, waves, stages, bands, chess, items) {
       freeze: { scope: 'allUnsoldSlots', price: 0, consumedAtRoundStart: true, refreshWhileFrozenRerollsAll: true, rewardOfferFreezable: false },
       shopClearedAtCombatStart: 'unfrozenSlots',
       itemSellable: false, itemDestroyRefund: 0,
-      benchSize: act.constData.maxDeckChessCnt, tempSize: 5, deployCap: act.constData.maxBattleChessCnt,
+      benchSize: act.constData.maxDeckChessCnt + 5, tempSize: 5, deployCap: act.constData.maxBattleChessCnt,
       storeCntMax: act.constData.storeCntMax,
       equipPerChess: 2, maxArtsPerRound: 2,
       poolCopies: { 1: 12, 2: 14, 3: 18, 4: 16, 5: 8, 6: 5 },

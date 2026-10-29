@@ -55,7 +55,9 @@ export function renderInfo(u) {
     // 0.2.0 自选编队: the pick of a DIY slot's unit (UnitInfo.diy { charId, skillIndex, uniEquipId }; spine / avatar / name
     // are already the operator's) — the detail card composes the operator from it, the data lookups follow it
     diy: u.diy && typeof u.diy === 'object' && typeof u.diy.charId === 'string'
-      ? { charId: u.diy.charId, skillIndex: Number.isInteger(u.diy.skillIndex) ? u.diy.skillIndex : null, uniEquipId: typeof u.diy.uniEquipId === 'string' ? u.diy.uniEquipId : null }
+      ? { charId: u.diy.charId, skillIndex: Number.isInteger(u.diy.skillIndex) ? u.diy.skillIndex : null,
+        uniEquipId: typeof u.diy.uniEquipId === 'string' ? u.diy.uniEquipId : null,
+        ...(u.diy.custom === true ? { custom: true } : null) }
       : undefined,
   };
 }

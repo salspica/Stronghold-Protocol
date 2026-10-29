@@ -69,7 +69,7 @@ export function ExperimentalOptions({ open, value, mode = 'coop', source = 'priv
           disabled=${!editable || busy} onChange=${e => change('disableSharedPool', e.currentTarget.checked)} />
       </label>
       <label class="experimental-option" for="experimental-custom-diy">
-        <span><strong>${t('自选干员自定义改动')}</strong><small>${t('结城理、丰川祥子等 8 名干员使用自定义盟约与特质；关闭时恢复其原本盟约且没有特质。')}</small></span>
+        <span><strong>${t('自选干员自定义改动')}</strong><small>${t('结城理、丰川祥子等 9 名干员使用自定义盟约与特质；关闭时恢复其原本盟约且没有特质。')}</small></span>
         <input id="experimental-custom-diy" type="checkbox" role="switch" checked=${options.customDiy === true}
           disabled=${!editable || busy} onChange=${e => change('customDiy', e.currentTarget.checked)} />
       </label>

@@ -209,3 +209,43 @@ describe('feedback6 R21C: the 自选 picks in the bond popup\'s member list', ()
     assert.match(src, /onMember=\$\{\(id, items, standInFor, diy, skinId\) => setDetail\(\{ kind: 'chess', id, owner: bondPop\.ownerId, items: items \|\| null, standInFor: standInFor \|\| null, diy: diy \|\| null, \.\.\.\(skinId \? \{ skinId \} : null\) \}\)\}/);
   });
 });
+
+test('customDiy: a pick lists its custom bonds in the popup and its card carries the custom 特质', () => {
+  const CLEMNT = 'char_4231_clemnt';
+  const priv = privOf({ diy: { [T5A]: { charId: CLEMNT, skillIndex: 0 } }, customDiy: true });
+  for (const b of ['egirShip', 'skillfulShip', 'swiftShip', 'raidShip', 'indomShip']) {
+    const r = rowsOf(b, priv).find((x) => x.id === T5A);
+    assert.ok(r, `the pick is a ${b} row`);
+  }
+  const pop = popup({ bondId: 'skillfulShip', priv, entry: { ...ENTRY, count: 1 } });
+  assert.ok(memberButtons(pop).some((v) => v.props['data-diy'] === CLEMNT), 'the 灵巧 popup lists her');
+  const card = resolveDetail({ kind: 'chess', id: T5A, owner: 'p_1', items: null, standInFor: null, diy: null }, new Map(), { priv, backups: D.backups });
+  assert.equal(card.chess.charId, CLEMNT);
+  assert.deepEqual(card.chess.garrisonIds, ['garrison_902_a'], 'the custom 特质 reaches the detail card');
+  // off: the derived 阿戈尔 only and no 特质
+  const off = { ...priv, customDiy: false };
+  assert.deepEqual(rowsOf('skillfulShip', off).filter((x) => x.id === T5A), []);
+  const plain = resolveDetail({ kind: 'chess', id: T5A, owner: 'p_1', diy: null }, new Map(), { priv: off, backups: D.backups });
+  assert.deepEqual(plain.chess.bonds, ['egirShip']);
+  assert.deepEqual(plain.chess.garrisonIds ?? [], []);
+});
+
+test('battle unit detail: UnitInfo diy.custom shows the custom bonds and 特质 (not the default record)', () => {
+  const CLEMNT = 'char_4231_clemnt';
+  const priv = privOf({ diy: { [T5A]: { charId: CLEMNT, skillIndex: 0 } }, customDiy: true });
+  const card = resolveDetail({ kind: 'unit', unit: { kind: 'op', id: 77, uid: 77, defId: T5A, side: 'ally',
+    diy: { charId: CLEMNT, skillIndex: 0, custom: true } } }, new Map(), { priv, backups: D.backups });
+  assert.equal(card.chess.charId, CLEMNT);
+  assert.deepEqual(card.chess.bonds, ['egirShip', 'indomShip', 'swiftShip', 'raidShip', 'skillfulShip']);
+  assert.deepEqual(card.chess.garrisonIds, ['garrison_902_a']);
+  // without the flag (a stale unit / the default room) the derived record, as before
+  const plain = resolveDetail({ kind: 'unit', unit: { kind: 'op', id: 78, uid: 78, defId: T5A, side: 'ally',
+    diy: { charId: CLEMNT, skillIndex: 0 } } }, new Map(), { priv, backups: D.backups });
+  assert.deepEqual(plain.chess.bonds, ['egirShip']);
+  assert.deepEqual(plain.chess.garrisonIds ?? [], []);
+  // an own battle unit whose pick predates the flag still follows m.private.customDiy (ownerId is the viewer)
+  const ownStale = resolveDetail({ kind: 'unit', unit: { kind: 'op', id: 79, uid: 79, ownerId: 'p_1', defId: T5A, side: 'ally',
+    diy: { charId: CLEMNT, skillIndex: 0 } } }, new Map(), { priv, backups: D.backups });
+  assert.deepEqual(ownStale.chess.bonds, ['egirShip', 'indomShip', 'swiftShip', 'raidShip', 'skillfulShip']);
+  assert.deepEqual(ownStale.chess.garrisonIds, ['garrison_902_a']);
+});

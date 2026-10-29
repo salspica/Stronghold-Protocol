@@ -243,7 +243,7 @@
 //   common.js        what the modules share (FLOW_TICKER_PRIORITY, DELAYS, BAND_TURN_SECONDS, AFK_REMOVE_ROUNDS —
 //                    re-exported here, OK, fail, BOSS_CLOCK_MS, AFK_ACTIONS)
 
-import { PHASE, modeIdFor } from '../../shared/constants.js';
+import { PHASE, modeIdFor, bondLayerCapFor } from '../../shared/constants.js';
 import { experimentalOptions } from '../../shared/experimental.js';
 import { roomCapacity } from '../../shared/playerCapacity.js';
 import { createDamageBoard } from './damageBoard.js';
@@ -472,6 +472,8 @@ export class Match {
     this.disableDuckLord = this.capacityExperiment && this.experimental.disableDuckLord === true;
     /** 自选干员自定义盟约 / 特质 (experimental options): the eight hand-designed picks; off = derived bonds, no 特质. */
     this.customDiy = this.experimental.customDiy === true;
+    /** The room's bond layer cap: 9999 only in the custom-DIY experimental room, 999 everywhere else. */
+    this.bondLayerCap = bondLayerCapFor(this.customDiy);
     /** 最终首领血量 (experimental options): R14 Final Assault / R15 Hidden Core pool × 1 / 5 / 10 / 100. */
     this.bossHpMul = this.experimental.bossHpMul ?? 1;
     this.gd.disableDuckLord = this.disableDuckLord;

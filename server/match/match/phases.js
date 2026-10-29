@@ -432,7 +432,11 @@ export class MatchPhases {
 
   afterRoundStart() {
     if (this.gd.spRounds().includes(this.round)) this.enterSpDraft();
-    else this.beforePrepOffers();
+    else {
+      this.beforePrepOffers();
+      // the custom-DIY room's R4 机变: a personal two-card draft of each player's own 自选 picks
+      if (this.round === 4 && this.customDiy) this.offerDiyChoices();
+    }
   }
 
   beforePrepOffers() {

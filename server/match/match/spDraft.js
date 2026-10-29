@@ -192,6 +192,57 @@ export class MatchSpDraft {
     this.cancel(this._turnTimer);
     this._turnTimer = null;
     this.beforePrepOffers();
+    if (this.round === 4 && this.customDiy) this.offerDiyChoices();
+  }
+
+  /** 缪尔赛思, the R4 自选 draft's replacement when a seat has fewer than two own picks. */
+  static DIY_DRAFT_FALLBACK = 'chess_char_6_11_a';
+
+  /**
+   * The custom-DIY room's R4 机变 (experimental.customDiy): every alive seat gets a PERSONAL choice of two of its own
+   * 自选 operators (the picks in `ps.diy`), chosen independently — no turn order, no shared cards, no timer. A seat with
+   * fewer than two distinct picks fills the missing card(s) with 缪尔赛思. It lives in PREP like the 教鞭 choice:
+   * Ready waits for it, and the prep deadline auto-picks one. Called by MatchPhases.afterRoundStart after PREP starts.
+   */
+  offerDiyChoices() {
+    if (!this.customDiy || this.round !== 4) return;
+    const fallback = MatchSpDraft.DIY_DRAFT_FALLBACK;
+    const fallbackRec = this.gd.chess(fallback);
+    const fallbackName = fallbackRec?.name || '缪尔赛思';
+    const fallbackChar = fallbackRec?.charId || 'char_249_mlyss';
+    for (const ps of this.alivePlayers()) {
+      if (ps.personalChoice) continue;
+      const seen = new Set();
+      const own = [];
+      for (const [slotId, pick] of Object.entries(ps.diy || {})) {
+        if (!pick || typeof pick.charId !== 'string' || seen.has(pick.charId)) continue;
+        seen.add(pick.charId);
+        const rec = ps.gd.chess(slotId);
+        own.push({ kind: 'diy', slotId, charId: pick.charId, name: rec?.name || pick.charId,
+          tier: rec?.tier ?? 6, desc: `获得自选干员「${rec?.name || pick.charId}」` });
+      }
+      const order = this.rngMeta.shuffle(own.slice());
+      const cards = [];
+      for (let i = 0; i < 2; i++) {
+        const c = order[i];
+        cards.push(c || { kind: 'diy', slotId: null, charId: fallbackChar, chessId: fallback, name: fallbackName,
+          tier: fallbackRec?.tier ?? 6, desc: `获得自选干员「${fallbackName}」` });
+      }
+      ps.personalChoice = { id: `${this.battlePrefix}.choice.${this.nextUid()}`, round: this.round,
+        kind: 'diy', sourceItemId: null, cards };
+      ps.dirty();
+    }
+  }
+
+  /** `g.choice` of the R4 自选 draft: grant the chosen operator (a slot's composed pick, or 缪尔赛思). */
+  pickDiyChoice(ps, pending, idx) {
+    const card = pending.cards[idx];
+    let piece = card?.slotId ? ps.acquireChess(card.slotId, { source: 'diy_draft', fromPool: false }) : null;
+    if (!piece) piece = ps.acquireChess(card?.chessId || MatchSpDraft.DIY_DRAFT_FALLBACK, { source: 'diy_draft', fromPool: false });
+    if (!piece) return fail(ERR.BAD_TARGET);
+    ps.personalChoice = null;
+    ps.dirty();
+    return OK;
   }
 
   /**
@@ -224,6 +275,7 @@ export class MatchSpDraft {
     const pending = ps.personalChoice;
     if (!pending || pending.id !== choiceId || pending.round !== this.round) return fail(ERR.BAD_TARGET);
     if (!Number.isInteger(idx) || idx < 0 || idx >= pending.cards.length) return fail(ERR.BAD_TARGET);
+    if (pending.kind === 'diy') return this.pickDiyChoice(ps, pending, idx);
     if (!this.addBounty(ps, pending.cards[idx])) return fail(ERR.BAD_TARGET);
     ps.personalChoice = null;
     ps.dirty();
@@ -240,9 +292,9 @@ export class MatchSpDraft {
     const pending = ps.personalChoice;
     if (!pending) return undefined;
     const indices = pending.cards.map((c, i) => i);
-    const idx = mode === 'bot'
-      ? botPickCard(this, ps, pending.cards.map((c) => bountyCard(this.gd, c)), indices)
-      : this.rngMeta.pick(indices);
+    const idx = pending.kind === 'diy' || mode !== 'bot'
+      ? this.rngMeta.pick(indices)
+      : botPickCard(this, ps, pending.cards.map((c) => bountyCard(this.gd, c)), indices);
     return this.pickPersonalChoice(ps, idx, pending.id);
   }
 

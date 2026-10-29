@@ -21,7 +21,7 @@
 
 import { render } from '../../vendor/preact.module.js';
 import { html, TierChip } from './components.js';
-import { GEO } from '../../../shared/constants.js';
+import { GEO, handSlotAt } from '../../../shared/constants.js';
 import { chessAvatarUrl, itemIconUrl, tokenAvatarUrl, enemyIconUrl } from './assetUrls.js';
 import { tileKey, hasFlag, UF, penPlacement, PEN, fieldTile, ownStandIn, ownDiyRecord } from './gameLogic.js';
 import { t } from '../../../shared/i18n.js';
@@ -144,7 +144,9 @@ export function createFallbackView(host, opts = {}) {
   }
 
   const tilePos = (L, row, col) => ({ x: (col - st.rect.c0) * L.tile, y: (st.rect.r1 - row) * L.tile });
-  const handPos = (L, idx) => ({ x: idx * L.tile, y: (L.rows + 0.6) * L.tile });
+  const handPos = (L, idx) => (idx < 10
+    ? { x: idx * L.tile, y: (L.rows + 0.6) * L.tile }
+    : { x: (GEO.HAND_TOP_C0 + idx - 10) * L.tile, y: (L.rows + 1.72) * L.tile });
   const tempPos = (L, idx) => ({ x: (GEO.TEMP_C0 + idx) * L.tile, y: (L.rows + 1.72) * L.tile });
 
   // ---- pieces (prep) ---------------------------------------------------------------------------------------
@@ -384,7 +386,7 @@ export function createFallbackView(host, opts = {}) {
         const p = st.priv.hand?.[i];
         if (p) { const hp = heldPos(p) || pos; pieces.push(html`<${Piece} key=${p.uid} p=${p} x=${hp.x} y=${hp.y} L=${L} area="hand" />`); }
       }
-      const temp = Array.isArray(st.priv.temp) ? st.priv.temp : [];
+      const temp = [];
       if (temp.some(Boolean)) {
         for (let i = 0; i < GEO.TEMP_SIZE; i++) {
           const pos = tempPos(L, i);
@@ -541,8 +543,8 @@ export function createFallbackView(host, opts = {}) {
       const br = root.querySelector('.ff-board')?.getBoundingClientRect();
       if (!br) return null;
       let p = null;
-      if (row === GEO.HAND_ROW && col >= 0 && col < GEO.HAND_SIZE && st.mode === 'prep') p = handPos(L, col);
-      else if (row === GEO.TEMP_ROW && col >= GEO.TEMP_C0 && col < GEO.TEMP_C0 + GEO.TEMP_SIZE && st.mode === 'prep') p = tempPos(L, col - GEO.TEMP_C0);
+      const hi = st.mode === 'prep' ? handSlotAt(row, col) : null;
+      if (hi != null) p = handPos(L, hi);
       else if (row >= st.rect.r0 && row <= st.rect.r1 && col >= st.rect.c0 && col <= st.rect.c1) p = tilePos(L, row, col);
       if (!p) return null;
       const x0 = br.left + p.x, y0 = br.top + p.y, s = L.tile;

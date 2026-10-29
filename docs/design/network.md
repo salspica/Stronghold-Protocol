@@ -42,8 +42,8 @@ Platform additions (implemented): `welcome.{resumed, version}`, `welcome.testMod
 offered in every room, solo and co-op, and host-editable before the match through a rotary dial): the shared leader
 pool of the Final Assault (R14) and the Hidden Core (R15) is multiplied by it (`server/match/finalAssault.js bossPoolHp`
 → `Match.bossHpMul`, the room's rule snapshotted at launch).
-`experimental.customDiy` is an **optional strict boolean**, default false and canonically omitted when false: the eight
-hand-designed 自选 picks (结城理, 丰川祥子, 娜仁图亚, 阿斯卡纶, 斩业星熊, 望, 克莱门莎, 涤火杰西卡) use their custom bonds
+`experimental.customDiy` is an **optional strict boolean**, default false and canonically omitted when false: the nine
+hand-designed 自选 picks (结城理, 丰川祥子, 娜仁图亚, 阿斯卡纶, 斩业星熊, 望, 克莱门莎, 涤火杰西卡, 艾丽妮) use their custom bonds
 and 卫戍特质 (`data/backups.json diy.operators[id].custom`, `Match.customDiy` → `PlayerState.setDiy`); off, a normal room
 fields the derived bonds and no 特质. It is offered in every room before the match and enters the same rule-compatibility
 comparison as the other options.

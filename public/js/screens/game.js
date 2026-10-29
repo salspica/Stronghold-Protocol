@@ -1671,9 +1671,10 @@ function MatchScreen() {
   const ufShown = !!(selEntry && editable && !facing && !drag && showPrep && ufGeo);
   // the temp overflow row holds pieces (user playtest #3 item 3): framed and labelled on the own prep board
   const temp = tempInfo(priv);
-  const tempNotice = temp.count > 0 && !!view && viewKind !== 'loading' && showPrep && alive && !pen && !sp;
+  // the five former 临时整备区 cells are regular hand slots now: the overflow queue is hidden and never framed
+  const tempNotice = false;
   // the ready button shows why it is refused under it (ui/hud.js ReadyToggle): the effects column moves down a line
-  const readyWhy = phase === PHASE.PREP && alive && !priv?.ready && (hasPersonalChoice || temp.count > 0);
+  const readyWhy = phase === PHASE.PREP && alive && !priv?.ready && hasPersonalChoice;
   // the frame the panels are laid out in: the HUD layer (client px; inside the safe-area insets of a notched phone),
   // and the root font size (1rem)
   const panelFrame = () => {

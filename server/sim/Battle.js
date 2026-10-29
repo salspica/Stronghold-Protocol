@@ -77,6 +77,7 @@ export class Battle {
     this.seed = (Number(opts.seed) >>> 0) || 1;
     this.rng = createRng(this.seed);
     this.kind = opts.kind ?? 'normal';
+    this.bondLayerCap = Number.isInteger(opts.bondLayerCap) && opts.bondLayerCap > 0 ? opts.bondLayerCap : 999;
     this.modeId = opts.modeId ?? null;
     this.round = opts.round ?? 0;
     this.fieldId = opts.fieldId ?? null;

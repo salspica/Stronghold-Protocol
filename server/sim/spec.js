@@ -41,6 +41,7 @@
 import { Battle } from './Battle.js';
 import { toDataSource, withUnitLoadouts } from './simdata.js';
 import { isPotential, isCultivate } from '../../shared/potential.js';
+import { BOND_LAYER_CAP } from '../../shared/constants.js';
 import { isContentHash } from '../../shared/plugins/identity.js';
 import { BOSS_POOL_MIN_HP } from './constants.js';
 import { OPERATOR_SKINS } from '../../shared/skins.js';
@@ -68,6 +69,8 @@ export function buildBattleSpec(o = {}) {
   const tl = Number(o.timeLimit);
   const spec = {
     v: SPEC_VERSION,
+    // the room's bond cap (999; the custom-DIY experimental room sends 9999)
+    bondLayerCap: Number.isInteger(o.bondLayerCap) && o.bondLayerCap > 0 ? o.bondLayerCap : BOND_LAYER_CAP,
     battleId: o.battleId ?? null,
     fieldId: o.fieldId ?? null,
     kind: o.kind ?? 'normal',
@@ -108,8 +111,8 @@ function sanitizeUnitSkin(u) {
 }
 
 /**
- * A well-formed 自选 pick `{ charId, skillIndex?, uniEquipId? }` reduced to those fields (skill 0–9 or null, module a
- * loadout id or null), or null.
+ * A well-formed 自选 pick `{ charId, skillIndex?, uniEquipId?, custom? }` reduced to those fields (skill 0–9 or null,
+ * module a loadout id or null, `custom` only when exactly true — the room's experimental.customDiy), or null.
  */
 function cleanDiyPick(d) {
   if (!d || typeof d !== 'object' || Array.isArray(d) || typeof d.charId !== 'string' || !LOADOUT_ID.test(d.charId)) return null;
@@ -122,6 +125,7 @@ function cleanDiyPick(d) {
     if (!(typeof d.uniEquipId === 'string' && LOADOUT_ID.test(d.uniEquipId))) return null;
     out.uniEquipId = d.uniEquipId;
   }
+  if (d.custom === true) out.custom = true;
   return out;
 }
 
