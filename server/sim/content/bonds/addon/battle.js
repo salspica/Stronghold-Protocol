@@ -71,7 +71,7 @@
 // Hooks registered only when a bond needs them. Priorities: `hit` −20 (坚守 redirect, after other modifiers had their
 // say), `death` 10 (不屈, the bond slot of the revive/redeploy convention); everything else 0.
 
-import { experimentalLinear } from '../../../../shared/constants.js';
+import { experimentalLinear } from '../../../../../shared/constants.js';
 import { canTargetEnemy, enemyStealthed, extendedGrid } from '../../../targeting.js';
 import { normDir, rotateOffset, localOrder, localBefore } from '../../../dir.js';
 import { bodyKeys, bodyInRange } from '../../../body.js';

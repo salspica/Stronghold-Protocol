@@ -236,6 +236,7 @@ function installSargon(battle, pid, bb, members) {
   const applyFinal = () => {
     const L = S.bondLayers(battle, pid, 'sargonShip');
     const mul = six && L >= 1000 ? 1 + 4 * (L - 1000) / 8999 : 1;
+    if (mul <= 1) return;
     for (const m of members) S.passiveBuff(battle, m, 'bond:sargon:final', { dmgDealtMul: mul });
   };
   applyFinal();
@@ -344,8 +345,8 @@ function installLaterano(battle, pid, bb, members) {
     const L = S.bondLayers(battle, pid, 'lateranoShip');
     const pen = L >= 1000 ? 0.01 + 0.69 * (L - 1000) / 8999 : 0;
     for (const m of members) {
-      S.passiveBuff(battle, m, 'bond:laterano:pen', pen > 0 ? { defIgnorePct: pen } : {});
-      S.passiveBuff(battle, m, 'bond:laterano:flat', L >= 5000 ? { atkFinal: 2000 } : {});
+      if (pen > 0) S.passiveBuff(battle, m, 'bond:laterano:pen', { defIgnorePct: pen });
+      if (L >= 5000) S.passiveBuff(battle, m, 'bond:laterano:flat', { atkFinal: 2000 });
     }
   };
   applyExp();
